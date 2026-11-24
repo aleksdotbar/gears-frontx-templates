@@ -282,6 +282,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(1, 'cell'))).toMatch(/\/render\/status_tones/);
   });
 
+  it('accepts a cartesian_chart unlisted_stack_group, and fails one that is not a string', () => {
+    const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
+    const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = ['outcome', 5];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, chart, 'unlisted_stack_group', `a${index}`, value))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(1, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(1, 'cell'))).toMatch(/\/render\/unlisted_stack_group is not of type /);
+  });
+
   it('keeps a widget of an unregistered type a failure of its own cell', () => {
     const { types } = loaded();
     const unknown = { ...pie('1a2b3c4d-0000-4000-8000-000000000003'), id: `${PIE.replace('pie_chart.v1~', 'pie_chart.v2~')}1a2b3c4d-0000-4000-8000-000000000003` };
