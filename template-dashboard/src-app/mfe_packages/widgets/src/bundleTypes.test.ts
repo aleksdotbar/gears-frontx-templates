@@ -30,6 +30,13 @@ describe('the types the widget bundles declare', () => {
     expect([...ids].sort()).toEqual(ownIds(bundle));
   });
 
+  it('take a grid column value_format by reference to the shared value_format type, not as a copy of it', () => {
+    type RenderType = { $id: string; allOf: Array<{ properties?: { columns?: { items: { properties: Record<string, Record<string, unknown>> } } } }> };
+    const render = (BUNDLE_TYPES.grid as unknown as RenderType[]).find((type) => type.$id === idOf.render('grid'));
+    const columns = render?.allOf.find((part) => part.properties?.columns)?.properties?.columns;
+    expect(columns?.items.properties.value_format).toEqual({ $ref: 'gts://gts.frontx.dashboard.widget.value_format.v1~', description: expect.any(String) });
+  });
+
   it('are, together, the 44 types the catalog served file had, each id once', () => {
     expect(BUNDLES).toHaveLength(15);
     expect(IN_BUNDLE_PARTS.types).toHaveLength(44);

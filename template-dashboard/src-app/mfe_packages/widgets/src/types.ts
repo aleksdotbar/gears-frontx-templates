@@ -4,6 +4,8 @@
  * type schemas there are normative; these types mirror them.
  */
 
+import type { ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
+
 export interface CartesianSeriesOption {
   name: string;
   type: 'bar' | 'line' | 'area' | 'scatter';
@@ -84,6 +86,8 @@ export interface GridColumn {
   /** Width in pixels; the table is at least the sum of the widths (a floor for a column without one) and scrolls sideways in a narrower cell. */
   width?: number;
   format?: { notation?: 'standard' | 'compact' };
+  /** The format of the column's numbers, in place of the widget's `value_format`; a progress column takes none. */
+  value_format?: ValueFormat;
   align?: 'start' | 'end' | 'center';
   sortable?: boolean;
   /** `truncate` keeps one line per cell; the full text stays in the cell's title. */
