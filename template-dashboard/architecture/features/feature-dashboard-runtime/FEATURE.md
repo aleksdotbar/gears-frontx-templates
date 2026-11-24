@@ -102,6 +102,7 @@ The product writes no data code; the runtime runs each widget's binding against 
 - The viewer opens a dashboard id and sees the dashboard with every widget in its own state.
 - The viewer returns to a dashboard the root has already loaded: the cells remount from the kept registrations without fetching the served file again, and every binding runs again.
 - The viewer opens a dashboard id again after a dashboard-level failure: the root starts a new load.
+- The host calls `reload()` after it edited or added a dashboard: the shown dashboard loads again from a new read of the served file, and a dashboard id the earlier read did not serve loads.
 
 **Error Scenarios**:
 - The dashboard itself fails (file, type, validation, including an embedded widget that breaks the open widget base, or layout): the dashboard area shows the cannot-be-shown state.
@@ -217,7 +218,7 @@ The product writes no data code; the runtime runs each widget's binding against 
 1. [ ] - `p1` - The viewer leaves the dashboard. - `inst-dr-leave-go`
 2. [ ] - `p1` - The root closes any open larger view (its extension unmounts) and unmounts every cell extension. - `inst-dr-leave-unmount`
 3. [ ] - `p1` - The root keeps the types, the dashboard instance, the widget instances, the stamped data instances, and the generated extensions registered, so a return to the same dashboard reuses them. - `inst-dr-leave-keep`
-4. [ ] - `p1` - Before another dashboard loads, the root unregisters the generated extensions. - `inst-dr-leave-unregister`
+4. [ ] - `p1` - Before another dashboard loads, the root unregisters the generated extensions; a `reload()` from the host unregisters those of every dashboard the root loaded. - `inst-dr-leave-unregister`
 5. [ ] - `p1` - The root does not cancel requests in flight: each one ends with its answer or its 30000 ms timeout. The root drops any result for an extension no longer mounted, registers no stamped data for it, and never sends to an unmounted extension. - `inst-dr-leave-drop`
 6. [ ] - `p1` - The root drops the held shared responses. - `inst-dr-leave-shared`
 7. [ ] - `p1` - A load superseded by a new dashboard id drops its shared responses and unregisters its generated extensions. - `inst-dr-leave-supersede`
@@ -384,11 +385,11 @@ The triggers, by level:
 1. [ ] - `p1` - **FROM** Idle **TO** Started **WHEN** the root registers the `widgets` domain (`cpt-frontx-dashboard-algo-dashboard-runtime-register-domain`). - `inst-dr-owner-idle-started`
 2. [ ] - `p1` - **FROM** Idle **TO** Placeholder **WHEN** the registry rejects the `widgets` domain; this start-failed placeholder has no exit. - `inst-dr-owner-idle-placeholder`
 3. [ ] - `p1` - **FROM** Started **TO** Loading **WHEN** the root begins to load a dashboard id; the dashboard-level loader shows. - `inst-dr-owner-started-loading`
-4. [ ] - `p1` - **FROM** Loading **TO** Loading **WHEN** the root begins to load another dashboard id; the earlier load is superseded and discarded, and nothing of it mounts. - `inst-dr-owner-loading-superseded`
+4. [ ] - `p1` - **FROM** Loading **TO** Loading **WHEN** the root begins to load another dashboard id, or the host calls `reload()`; the earlier load is superseded and discarded, and nothing of it mounts. - `inst-dr-owner-loading-superseded`
 5. [ ] - `p1` - **FROM** Loading **TO** Started **WHEN** the root is unmounted while loading; the load is discarded and nothing mounts. - `inst-dr-owner-loading-unmount`
 6. [ ] - `p1` - **FROM** Loading **TO** Loaded **WHEN** the dashboard passes its dashboard-level checks (`cpt-frontx-dashboard-flow-dashboard-runtime-open`, step 17). Loading ends there: the dashboard replaces the dashboard-level loader, and the bindings run in Loaded, each cell in its own cell state. - `inst-dr-owner-loading-loaded`
 7. [ ] - `p1` - **FROM** Loading **TO** Placeholder **WHEN** a dashboard-level trigger occurs at load (the file can't be fetched or its fetch times out, a type id of the base file equals a bundle base, the registry rejects a type, manifest or entry of the base file, the dashboard fails validation, a layout check fails, or the dashboard id names no dashboard in the served file); the placeholder replaces the dashboard-level loader. - `inst-dr-owner-loading-placeholder`
-8. [ ] - `p1` - **FROM** Loaded **TO** Loading **WHEN** the root begins to load another dashboard id, including while the loaded dashboard's bindings still run. First the root closes any open larger view, unmounts the cells, unregisters the generated extensions of the loaded dashboard, and drops its held shared responses; every later result of its bindings is dropped, so nothing of it is sent or shown after that. - `inst-dr-owner-loaded-loading`
+8. [ ] - `p1` - **FROM** Loaded **TO** Loading **WHEN** the root begins to load another dashboard id, or the same id again after the host calls `reload()`, including while the loaded dashboard's bindings still run. First the root closes any open larger view, unmounts the cells, unregisters the generated extensions of the loaded dashboard, and drops its held shared responses; every later result of its bindings is dropped, so nothing of it is sent or shown after that. - `inst-dr-owner-loaded-loading`
 9. [ ] - `p1` - **FROM** Placeholder **TO** Loading **WHEN** the root begins to load another dashboard id, or the same dashboard id again after a dashboard-level failure; never when the placeholder comes from a failed start. - `inst-dr-owner-placeholder-loading`
 
 The root keeps, per state: in Loading, the dashboard id it loads; in Loaded and Placeholder, the dashboard id, its outcome, and the registered generated extensions by widget id.
@@ -576,6 +577,7 @@ The root and widgets **MUST NOT** persist any state: no browser storage and no s
 - [ ] A static binding is evaluated and validated without a request, with no loader.
 - [ ] A cell and its larger view are independent snapshots for the own and static forms; a shared-form larger view shows the same held response as its cell.
 - [ ] Returning to a dashboard the root has already loaded remounts its cells from the kept registrations without fetching the served file again, and runs every binding again.
+- [ ] After the host calls `reload()`, the shown dashboard loads again from a new read of the served file: an edited dashboard shows its new content, a dashboard id the earlier read did not serve loads, the generated extensions of the earlier read are unregistered, no widget bundle loads again, and a load in flight answers from the new read while the answer to the earlier read registers nothing.
 - [ ] While dashboard A is still loading (before its cells mount), when the viewer opens dashboard B, A is discarded: nothing of A is shown, the extensions A registered are unregistered, and B loads.
 - [ ] When the viewer opens dashboard B while A's bindings still run, A's cells unmount, A's generated extensions are unregistered, A's held shared responses are dropped, no later result of A is sent or shown, and B loads.
 - [ ] Opening the dashboard id that is already loading joins that load: the served file is fetched once and the dashboard shows once.
