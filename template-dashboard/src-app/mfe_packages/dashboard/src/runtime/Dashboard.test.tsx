@@ -14,7 +14,7 @@ import { SharedRequests } from './binding';
 import { Dashboard, type DashboardProps } from './Dashboard';
 import { DashboardRoot, RENDER_RESERVED_FIELDS } from './DashboardRoot';
 import { fetchHost, type DashboardHost } from './host';
-import { renderStampIdOf, stampIdOf } from './ids';
+import { extensionIdOf, renderStampIdOf, stampIdOf } from './ids';
 
 /*
  * The runtime on the real FrontX registry and gts-plugin, in a simulated DOM:
@@ -609,6 +609,78 @@ describe('Dashboard on the real registry', () => {
     expect(lines[0]).toContain('the integer 9007199254740993 is outside the range a JSON number holds exactly');
     errors.mockRestore();
   }, 15_000);
+});
+
+// A product that edits or adds dashboards while the page is open reloads the root it already has.
+describe('a reload of the root', () => {
+  type Cell = { widget: { id: string; title?: string }; larger_view?: unknown };
+  const demo = DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { id: string; layout: { cells: Cell[] } };
+  const ADDED_ID = 'gts.frontx.dashboard.dashboard.dashboard.v1~7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f';
+  const titled = (kind: string, title: string): Cell => {
+    const { larger_view: _larger, ...cell } = demo.layout.cells.find((each) => each.widget.id.includes(`.${kind}.v1~`))!;
+    return { ...cell, widget: { ...cell.widget, title } };
+  };
+  /** The demo file with the demo dashboard holding `cells`, and `extra` records after it. */
+  const fileWith = (cells: Cell[], extra: Record<string, unknown>[] = []): ServedFile => ({
+    ...DEMO_SERVED_FILE,
+    instances: [...DEMO_SERVED_FILE.instances.filter((instance) => instance.id !== DEMO_DASHBOARD_ID), { ...demo, layout: { cells } }, ...extra],
+  });
+  const titlesOf = (outcome: Awaited<ReturnType<DashboardRoot['load']>>) => (outcome.ok ? outcome.dashboard.layout.cells.map((cell) => cell.widget.title) : []);
+
+  it('shows the edited dashboard and a dashboard id the file did not serve before, unregisters the earlier extensions and loads no widget again', async () => {
+    // The grid has no in-bundle entry, so it loads through the MF handler, which keeps each load by its key for the page's life.
+    const bundleLoad = vi.spyOn(MfeHandlerMF.prototype, 'load').mockImplementation(async () => probeEntry());
+    const { [`${ENTRY}grid.v1`]: _grid, ...withoutGrid } = entries;
+    let file = fileWith([titled('grid', 'Before the edit'), titled('metric_card', 'Removed by the edit')]);
+    let reads = 0;
+    const host = { ...createMockHost({ delayMs: 0 }), loadFile: () => (reads++, Promise.resolve(file)) };
+    const root = new DashboardRoot({ host, entries: withoutGrid, origin: globalThis.location.origin });
+    const view = render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+    const shown = () => shadowTexts(view.container).filter((text) => text.startsWith('theme light')).length;
+    await waitFor(() => expect(shown()).toBe(2), { timeout: 5000 });
+    const removed = extensionIdOf(titled('metric_card', '').widget.id, 'cell', `${ENTRY}metric_card.v1`);
+    expect(root.registry!.getExtension(removed)).toBeDefined();
+    const keysBefore = new Set(bundleLoad.mock.calls.map(([, key]) => key));
+    expect(keysBefore.size).toBe(1);
+
+    file = fileWith([titled('grid', 'After the edit')], [{ ...demo, id: ADDED_ID, layout: { cells: [titled('metric_card', 'On the added dashboard')] } }]);
+    act(() => root.reload());
+    expect(await screen.findByText('After the edit', {}, { timeout: 5000 })).toBeTruthy();
+    await waitFor(() => expect(shown()).toBe(1), { timeout: 5000 });
+    expect(screen.queryByText('Before the edit')).toBeNull();
+    expect(screen.queryByText('Removed by the edit')).toBeNull();
+    expect(root.registry!.getExtension(removed)).toBeUndefined();
+    // Every bundle load after the reload names a key from before it, so the MF handler answers from what it holds.
+    expect(bundleLoad.mock.calls.every(([, key]) => keysBefore.has(key))).toBe(true);
+
+    view.rerender(<Dashboard root={root} dashboardId={ADDED_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+    expect(await screen.findByText('On the added dashboard', {}, { timeout: 5000 })).toBeTruthy();
+    await waitFor(() => expect(shown()).toBe(1), { timeout: 5000 });
+    expect(reads).toBe(2);
+    view.unmount();
+  }, 20_000);
+
+  it.each([
+    ['before', [0, 1]],
+    ['after', [1, 0]],
+  ])('answers a load in flight from the newest file, and registers nothing of the older answer that arrives %s the newer one', async (_when, order) => {
+    const OLDER_ONLY = 'gts.frontx.dashboard.widget_data.widget_data.v1~frontx.test.widget_data.older_only.v1~';
+    const older: ServedFile = {
+      ...fileWith([titled('metric_card', 'Older')]),
+      types: [...DEMO_SERVED_FILE.types, { $id: `gts://${OLDER_ONLY}`, $schema: 'http://json-schema.org/draft/2020-12/schema', type: 'object' }],
+    };
+    const newer = fileWith([titled('metric_card', 'Newer')]);
+    const answers: ((file: ServedFile) => void)[] = [];
+    const root = new DashboardRoot({ host: { ...createMockHost({ delayMs: 0 }), loadFile: () => new Promise((resolve) => answers.push(resolve)) }, entries });
+    const inFlight = root.load(DEMO_DASHBOARD_ID);
+    root.reload();
+    const fresh = root.load(DEMO_DASHBOARD_ID);
+    expect(answers).toHaveLength(2);
+    for (const index of order) answers[index](index === 0 ? older : newer);
+    expect(titlesOf(await inFlight)).toEqual(['Newer']);
+    expect(titlesOf(await fresh)).toEqual(['Newer']);
+    expect(root.types.getSchema(OLDER_ONLY)).toBeUndefined();
+  });
 });
 
 // The root stamps each widget's render with its widget type's render type and registers it, like the data.
