@@ -36,7 +36,10 @@ export interface CartesianRender {
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;
-    /** `auto` skips labels that would collide; `every` labels every category, thinning out only when they cannot fit. */
+    /**
+     * `auto` skips labels that would collide; `every` labels every category, thinning out only when they cannot fit. On a
+     * category axis either first cuts a level label longer than its room with an ellipsis.
+     */
     tick_labels?: 'auto' | 'every';
     tick_angle?: 0 | -45 | -90;
   };
