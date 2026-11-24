@@ -7,7 +7,7 @@ import { DEFAULT_WIDGET_TEXTS } from '../states';
 import { CartesianChart, checkCartesian } from './CartesianChart';
 
 /*
- * The cartesian chart's orientation, percent stack, extreme marks, reference lines and bubble sizes.
+ * The cartesian chart's orientation, percent stack, stack of unlisted series, extreme marks, reference lines and bubble sizes.
  * The tests' charts are 640 by 320 pixels (src-app/test-setup.ts).
  */
 
@@ -185,6 +185,73 @@ describe('cartesian_chart percent stack', () => {
     expect(checkCartesian(render, TEAMS)).toBe('cartesian_chart: series 1 is on a percent stacked axis without a stack group');
     // On the other axis it keeps its own values.
     expect(checkCartesian({ ...render, series: [render.series![0], { name: 'Closed', type: 'line', y_axis: 'secondary' }] }, TEAMS)).toBeNull();
+  });
+});
+
+describe('cartesian_chart stack of unlisted series', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // One series per value of an outcome column: the names come only with the data.
+  const OUTCOMES: CartesianData = {
+    series: [
+      { name: 'ok', points: [{ x: 'Web', y: 12 }, { x: 'Data', y: 30 }, { x: 'Infra', y: 6 }] },
+      { name: 'failed', points: [{ x: 'Web', y: 4 }, { x: 'Data', y: 10 }, { x: 'Infra', y: 2 }] },
+    ],
+  };
+  const inGroup = (name: string): CartesianSeriesOption => ({ name, type: 'bar', stack_group: 'outcome' });
+  const WITH_NAMED: CartesianData = {
+    series: [...OUTCOMES.series, { name: 'Retried', points: [{ x: 'Web', y: 3 }, { x: 'Data', y: 5 }, { x: 'Infra', y: 1 }] }, { name: 'Target', points: [{ x: 'Web', y: 20 }, { x: 'Data', y: 20 }, { x: 'Infra', y: 20 }] }],
+  };
+  const NAMED_OWN: CartesianSeriesOption[] = [{ name: 'Retried', type: 'bar' }, { name: 'Target', type: 'line' }];
+
+  /** What a viewer gets from a chart: the bars, value labels, legend, y ticks, the tooltip over Web, the text alternative and the data view. */
+  const viewOf = async (options: CartesianRender, data: CartesianData) => {
+    const user = userEvent.setup();
+    const { container, unmount } = render(<CartesianChart payload={{ render: { ...options, value_labels: 'always', drill_down: true }, data }} label="Runs" />);
+    const texts = (selector: string) => [...container.querySelectorAll(selector)].map((element) => element.textContent);
+    const drawn = {
+      bars: bars(container),
+      values: [...container.querySelectorAll('.valueLabel')].map((label) => [label.textContent, label.getAttribute('x'), label.getAttribute('y')]),
+      legend: texts('.recharts-legend-wrapper [class*="legendItem"]'),
+      ticks: texts('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value'),
+      alternative: within(alternative('Runs')).getAllByRole('row', { hidden: true }).map((row) => row.textContent),
+    };
+    // Web, the first of three categories, spans about 52 to 245 px of the 640 px chart.
+    fireEvent.mouseMove(container.querySelector('.recharts-wrapper')!, { clientX: 150, clientY: 100, pageX: 150, pageY: 100 });
+    const tooltip = await waitFor(() => {
+      const text = container.querySelector('.recharts-tooltip-wrapper')?.textContent?.replace(/\s/g, ' ');
+      expect(text).toMatch(/^Web/);
+      return text;
+    });
+    await user.click(screen.getByRole('button', { name: 'Show data' }));
+    const region = await screen.findByRole('region', { name: 'Data of Runs' });
+    const dataView = within(region).getAllByRole('row').map((row) => row.textContent);
+    unmount();
+    return { ...drawn, tooltip, dataView };
+  };
+
+  it.each([
+    ['in an absolute stack', {}, OUTCOMES, [inGroup('ok'), inGroup('failed')]],
+    ['in a percent stack', { stack_mode: 'percent' }, OUTCOMES, [inGroup('ok'), inGroup('failed')]],
+    ['beside a named bar and a named line, which keep their own drawing', { series: NAMED_OWN }, WITH_NAMED, [inGroup('ok'), inGroup('failed'), ...NAMED_OWN]],
+  ] as const)('stacks the series without an entry as named entries of unlisted_stack_group, %s', async (_name, options, data, named) => {
+    const unlisted = await viewOf({ ...options, unlisted_stack_group: 'outcome' }, data);
+    // Each category's failed segment stands on its ok segment, not beside it.
+    const [ok, failed] = unlisted.bars;
+    for (const at of [0, 1, 2]) {
+      expect(failed[at].x, `category ${at}`).toBeCloseTo(ok[at].x, 3);
+      expect(failed[at].y + failed[at].height, `category ${at}`).toBeCloseTo(ok[at].y, 3);
+    }
+    expect(unlisted).toEqual(await viewOf({ ...options, series: [...named] }, data));
+  });
+
+  it('runs the percent stack checks on the series without an entry', () => {
+    const percent: CartesianRender = { stack_mode: 'percent', series: [inGroup('ok')] };
+    expect(checkCartesian(percent, OUTCOMES)).toBe('cartesian_chart: series 1 is on a percent stacked axis without a stack group');
+    expect(checkCartesian({ ...percent, unlisted_stack_group: 'outcome' }, OUTCOMES)).toBeNull();
+    const negative: CartesianData = { series: [OUTCOMES.series[0], { name: 'failed', points: [{ x: 'Web', y: 4 }, { x: 'Data', y: -1 }] }] };
+    expect(checkCartesian({ stack_mode: 'percent', unlisted_stack_group: 'outcome' }, negative)).toBe('cartesian_chart: series 1 point 1 is negative, and a percent stack takes no negative value');
+    failsWith({ render: { stack_mode: 'percent', unlisted_stack_group: 'outcome' }, data: negative }, 'series 1 point 1 is negative');
   });
 });
 

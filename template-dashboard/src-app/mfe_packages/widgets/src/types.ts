@@ -29,6 +29,8 @@ export type LegendPosition = 'top' | 'right' | 'bottom' | 'left' | 'none';
 
 export interface CartesianRender {
   series?: CartesianSeriesOption[];
+  /** The stack group of each data series without an entry in `series`: such a series draws as bars on the primary axis, stacked in this group. */
+  unlisted_stack_group?: string;
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;
