@@ -292,6 +292,17 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(1, 'cell'))).toMatch(/\/render\/unlisted_stack_group is not of type /);
   });
 
+  it('accepts a grid column value_format of the shared value_format type, and fails one outside its closed values', () => {
+    const type = shipped.find((id) => id.endsWith('.grid.v1~'))!;
+    const grid = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const [first, ...rest] = grid.render.columns as Array<Record<string, unknown>>;
+    const { types } = loaded();
+    const values = [{ value_type: 'percent', decimals: 1 }, { value_type: 'money' }, { value_type: 'percent', unit: 's' }];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, grid, 'columns', `a${index}`, [{ ...first, value_format: value }, ...rest]))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(1, 'cell'), slotOf(2, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(1, 'cell'))).toMatch(/\/render\/columns\/0\/value_format/);
+  });
+
   it('keeps a widget of an unregistered type a failure of its own cell', () => {
     const { types } = loaded();
     const unknown = { ...pie('1a2b3c4d-0000-4000-8000-000000000003'), id: `${PIE.replace('pie_chart.v1~', 'pie_chart.v2~')}1a2b3c4d-0000-4000-8000-000000000003` };

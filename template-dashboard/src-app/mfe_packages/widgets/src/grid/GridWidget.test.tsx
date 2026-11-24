@@ -432,6 +432,56 @@ describe('GridWidget', () => {
     });
   });
 
+  describe('a column with its own value_format', () => {
+    const COLUMNS: GridColumn[] = [
+      { key: 'name', title: 'Name' },
+      { key: 'count', title: 'Count' },
+      { key: 'change', title: 'Change', value_format: { value_type: 'percent', decimals: 1 } },
+      { key: 'trend', title: 'Trend', kind: 'sparkline', value_format: { value_type: 'percent' } },
+    ];
+    const ROWS: GridValue[][] = [
+      ['Alpha', 1234, 0.243, [0.1, 0.25]],
+      ['Beta', 56, -0.2, [0.5]],
+      ['Gamma', 7, -0.1, null],
+    ];
+    const payload = { render: { columns: COLUMNS, search: true }, data: { rows: ROWS }, value_format: { value_type: 'number' as const, decimals: 1 } };
+    const cellsOf = (index: number) => bodyRows().map((row) => within(row).getAllByRole('cell')[index].textContent);
+
+    it('shows its numbers by its own value_format, and a column without one by the widget value_format', async () => {
+      render(<GridWidget payload={payload} />);
+      await screen.findByText('Alpha');
+      expect(cellsOf(2)).toEqual(['24.3%', '-20.0%', '-10.0%']);
+      expect(cellsOf(1)).toEqual(['1,234.0', '56.0', '7.0']);
+    });
+
+    it('names the values of its sparkline by its own value_format', async () => {
+      render(<GridWidget payload={payload} />);
+      expect(await screen.findByRole('img', { name: 'First 10%, last 25%, lowest 10%, highest 25%' })).toBeTruthy();
+    });
+
+    it('sorts by its numbers, not by the text it shows', async () => {
+      const user = userEvent.setup();
+      render(<GridWidget payload={payload} />);
+      await screen.findByText('Alpha');
+      await user.click(screen.getAllByRole('button', { name: /sorting of 'Change'/ })[0]);
+      // As text, -20.0% would sort above -10.0%.
+      await vi.waitFor(() => expect(cellsOf(2)).toEqual(['24.3%', '-10.0%', '-20.0%']));
+    });
+
+    it.each([
+      ['24.3%', ['Alpha']],
+      ['1,234.0', ['Alpha']],
+      ['0.243', []],
+    ])('searches the text each column shows, for %j', async (query, names) => {
+      const user = userEvent.setup();
+      render(<GridWidget payload={payload} />);
+      await screen.findByText('Alpha');
+      await user.type(screen.getByRole('searchbox', { name: 'Search the table' }), query);
+      if (names.length === 0) expect(await screen.findByText('No rows match the search')).toBeTruthy();
+      else await vi.waitFor(() => expect(firstCells()).toEqual(names));
+    });
+  });
+
   describe('the shared link rule', () => {
     const ORIGIN = window.location.origin;
     const linkRows = (href: string): GridData => ({ rows: [[{ text: 'Go', href }]] });

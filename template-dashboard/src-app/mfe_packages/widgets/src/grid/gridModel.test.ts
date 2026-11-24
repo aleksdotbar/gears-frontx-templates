@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import type { ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
 
-import type { GridRender, GridValue } from '../types';
-import { checkGrid, pinnedCount, sortRows } from './gridModel';
+import type { GridColumn, GridRender, GridValue } from '../types';
+import { checkGrid, pinnedCount, searchRows, shownTextOf, sortRows } from './gridModel';
 
 const columns = (...keys: string[]) => keys.map((key) => ({ key }));
 const rows = (width: number, count = 1): GridValue[][] => Array.from({ length: count }, () => Array.from({ length: width }, () => null));
@@ -38,6 +39,31 @@ describe('grid sort', () => {
 
   it('reverses within each group and keeps nulls last when descending', () => {
     expect(sort('desc').map((item) => item.index)).toEqual([1, 6, 4, 0, 5, 3, 2]);
+  });
+});
+
+describe('a column value_format', () => {
+  const NUMBER: ValueFormat = { value_type: 'number' };
+  const PERCENT: ValueFormat = { value_type: 'percent', decimals: 1 };
+
+  it.each<[string, GridColumn, ValueFormat | undefined, number, string]>([
+    ['its own over the widget one', { key: 'c', value_format: PERCENT }, NUMBER, 0.243, '24.3%'],
+    ['its own when the widget has none', { key: 'c', value_format: PERCENT }, undefined, 0.243, '24.3%'],
+    ['the widget one when it has none', { key: 'c' }, PERCENT, 0.243, '24.3%'],
+    ['no format when neither has one', { key: 'c' }, undefined, 0.243, '0.243'],
+    ['its own with its notation', { key: 'c', format: { notation: 'compact' }, value_format: { value_type: 'currency', currency: 'USD' } }, NUMBER, 1234567, '$1.2M'],
+  ])('formats a number of a column by %s', (_name, column, widgetFormat, value, shown) => {
+    expect(shownTextOf(value, column, widgetFormat, 'en')).toBe(shown);
+  });
+
+  it.each([
+    ['24.3%', ['r1']],
+    ['1,234', ['r1']],
+    ['0.243', []],
+  ])('searches the text each column shows by its own format, for %j', (query, ids) => {
+    const columns: GridColumn[] = [{ key: 'id' }, { key: 'share', value_format: PERCENT }, { key: 'count' }];
+    const rows: GridValue[][] = [['r1', 0.243, 1234], ['r2', 0.05, 56]];
+    expect(searchRows(rows, (row) => row, query, columns, NUMBER, 'en').map((row) => row[0])).toEqual(ids);
   });
 });
 
