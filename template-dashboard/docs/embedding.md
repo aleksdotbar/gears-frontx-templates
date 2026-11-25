@@ -153,6 +153,15 @@ To mock the product's own endpoints, copy `src-app/mfe_packages/dashboard/src/mo
 - A cell whose request, transform, data or widget fails shows "This widget cannot be shown"; the rest of the dashboard is unaffected. The same holds for a widget bundle that does not load, answers 404 or throws while it loads: only the cells of that widget type fail.
 - A served file that cannot be loaded or registered, an unknown dashboard id, or a dashboard that fails its type shows "This dashboard cannot be shown".
 - Each failure writes one line to the browser console naming the dashboard, the widget and the failing step. The viewer never sees the cause.
+- To report cell failures, for example to an error tracker, pass `onFailure` when creating the root. The root calls it each time a cell or a larger view shows "This widget cannot be shown", with the dashboard id, the widget id and type, the role (`cell` or `larger_view`) and the reason: a `kind` (`registration`, `mount`, `request`, `transform`, `data` or `render_widget`) and the `message` of the console line. Group by `kind`, as the message wording can change in any release. The message carries no variable value of the host, but it can quote parts of an answer. The hook changes nothing on screen, and a hook that throws only adds a console line. Dashboard-level failures do not call it.
+
+```tsx
+const dashboards = new DashboardRoot({
+  host,
+  onFailure: ({ dashboardId, widgetType, role, reason }) =>
+    tracker.captureMessage(reason.message, { tags: { kind: reason.kind, dashboardId, widgetType, role } }),
+});
+```
 
 ## Try it
 
