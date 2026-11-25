@@ -11,7 +11,7 @@ import { composeServedFile } from './served';
 /** The demo file with the catalog bundles' parts, as a product serves it. */
 const DEMO_SERVED_FILE = composeServedFile(DEMO_WITHOUT_BUNDLES, IN_BUNDLE_PARTS);
 import { SharedRequests } from './binding';
-import { Dashboard, type DashboardProps } from './Dashboard';
+import { Dashboard, type CellActionTarget, type DashboardProps } from './Dashboard';
 import { DashboardRoot, RENDER_RESERVED_FIELDS } from './DashboardRoot';
 import { fetchHost, type DashboardHost } from './host';
 import { renderStampIdOf, stampIdOf } from './ids';
@@ -1509,8 +1509,40 @@ describe('variables from the host', () => {
     }, 15_000);
   });
 
+  describe('the host actions', () => {
+    it('asks the host for the actions of each cell and of its open larger view, shows none where it gives none, and runs the one picked', async () => {
+      const goals = { ...CELLS[3], widget: { ...CELLS[3].widget, title: 'Goals' }, larger_view: { ...cellOf('b009', { source: 'ci', transform: "{'value': response.value}" }).widget, title: 'Goals by day' } };
+      const ci = { ...CELLS[0], widget: { ...CELLS[0].widget, title: 'CI' } };
+      const { host } = countingHost(fileOf(undefined, [goals, ci]));
+      const asked: CellActionTarget[] = [];
+      const picked: CellActionTarget[] = [];
+      const cellActions = (target: CellActionTarget) => {
+        asked.push(target);
+        return target.widgetId === ci.widget.id ? [] : [{ label: `Rows of ${target.role}`, onSelect: () => picked.push(target) }];
+      };
+      const { container } = render(<PeriodHost root={new DashboardRoot({ host, entries: entriesWithValues, origin: 'http://localhost' })} dashboardId={VARIABLES_ID} theme="light" language="en" cellActions={cellActions} />);
+      await waitFor(() => expect(values(container)).toEqual(['value null', 'value 30']), { timeout: 5000 });
+      const cell = (widgetId: string) => ({ dashboardId: VARIABLES_ID, widgetId, role: 'cell' });
+      const largerView = { dashboardId: VARIABLES_ID, widgetId: goals.larger_view.id, role: 'larger_view' };
+      expect(asked).toContainEqual(cell(goals.widget.id));
+      expect(asked).toContainEqual(cell(ci.widget.id));
+      // A closed larger view is not asked.
+      expect(asked).not.toContainEqual(largerView);
+      expect(within(screen.getByRole('group', { name: 'CI' })).queryAllByRole('button')).toEqual([]);
+
+      fireEvent.click(within(screen.getByRole('group', { name: 'Goals' })).getByRole('button', { name: 'Rows of cell' }));
+      expect(picked).toEqual([cell(goals.widget.id)]);
+
+      fireEvent.click(screen.getByRole('button', { name: 'Open Goals larger' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Goals by day' });
+      expect(asked).toContainEqual(largerView);
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Rows of larger_view' }));
+      expect(picked).toEqual([cell(goals.widget.id), largerView]);
+    }, 15_000);
+  });
+
   describe('a frameless cell', () => {
-    const markdown = (DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } }).layout.cells.find((cell) =>
+    const markdown =(DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } }).layout.cells.find((cell) =>
       cell.widget.id.includes('.markdown_card.'),
     )!;
     const heading = { size: 'large', frame: false, widget: { id: markdown.widget.id, render: { body: '## Section\n\nA paragraph.' } } };

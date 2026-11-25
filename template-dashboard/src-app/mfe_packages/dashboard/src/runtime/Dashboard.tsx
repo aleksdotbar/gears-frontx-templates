@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 
 import { intlLocaleOf, kitScopeOf, type DashboardCell, type WidgetInstance } from '../contract';
 import { DashboardArea, DEFAULT_DASHBOARD_TEXTS, type DashboardTexts } from '../DashboardArea';
-import { CellFrame, DEFAULT_FRAME_TEXTS, StateBody, useRetryFocus, type CellState, type FrameTexts } from '../frame/CellFrame';
+import { CellFrame, DEFAULT_FRAME_TEXTS, StateBody, useRetryFocus, type CellAction, type CellState, type FrameTexts } from '../frame/CellFrame';
 import { readValue, SharedRequests, UNREADABLE, variablesOfBinding, type VariableValues } from './binding';
 import type { CellRun, DashboardRoot, LoadOutcome } from './DashboardRoot';
 import type { Role } from './ids';
@@ -22,6 +22,13 @@ const SLOT: CSSProperties = { display: 'flex', flex: 1, flexDirection: 'column',
 const PLACING_FRAME: CSSProperties = { ...SLOT, position: 'relative' };
 const PLACING_LOADER: CSSProperties = { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column' };
 
+/** The slot whose actions the root asks the host for: the widget instance a cell or its larger view shows. */
+export interface CellActionTarget {
+  dashboardId: string;
+  widgetId: string;
+  role: Role;
+}
+
 export interface DashboardProps {
   root: DashboardRoot;
   dashboardId: string;
@@ -36,9 +43,14 @@ export interface DashboardProps {
    * number or a boolean, fails its cell. A change of a value re-runs only the cells whose request names it.
    */
   variables?: VariableValues;
+  /**
+   * The host's own actions on a cell and on its larger view, drawn as buttons beside the frame's own. The root asks on
+   * each render of a framed cell, and of a larger view while it is open; an empty list draws none.
+   */
+  cellActions?: (target: CellActionTarget) => readonly CellAction[];
 }
 
-export function Dashboard({ root, dashboardId, theme, language, texts, variables }: DashboardProps) {
+export function Dashboard({ root, dashboardId, theme, language, texts, variables, cellActions }: DashboardProps) {
   // Both values are on the domain before any cell mounts: a layout effect runs before the cells' own effects.
   useLayoutEffect(() => root.publish(theme, language), [root, theme, language]);
   const [outcome, setOutcome] = useState<{ id: string; outcome: LoadOutcome }>();
@@ -82,6 +94,7 @@ export function Dashboard({ root, dashboardId, theme, language, texts, variables
           frameTexts={frameTexts}
           container={container}
           values={variables}
+          cellActions={cellActions}
         />
       ) : (
         <DashboardArea failed={loaded !== undefined} renderCell={() => null} texts={texts?.dashboard ?? DEFAULT_DASHBOARD_TEXTS} />
@@ -98,6 +111,7 @@ function LoadedDashboard({
   frameTexts,
   container,
   values: given,
+  cellActions,
 }: {
   root: DashboardRoot;
   dashboardId: string;
@@ -106,6 +120,7 @@ function LoadedDashboard({
   frameTexts: FrameTexts;
   container: HTMLElement | null;
   values?: VariableValues;
+  cellActions?: DashboardProps['cellActions'];
 }) {
   // One set of held shared answers per shown dashboard; it goes with the dashboard.
   const shared = useMemo(() => new SharedRequests(loaded.dashboard.requests ?? {}, root.host, root.origin), [loaded, root]);
@@ -158,7 +173,7 @@ function LoadedDashboard({
       layout={loaded.dashboard.layout}
       texts={texts ?? DEFAULT_DASHBOARD_TEXTS}
       renderCell={(cell, index) => (
-        <Cell root={root} dashboardId={dashboardId} cell={cell} index={index} failed={loaded.failed} shared={shared} values={current} texts={frameTexts} container={container} runs={runs} retry={retry} />
+        <Cell root={root} dashboardId={dashboardId} cell={cell} index={index} failed={loaded.failed} shared={shared} values={current} texts={frameTexts} container={container} runs={runs} retry={retry} cellActions={cellActions} />
       )}
     />
   );
@@ -289,6 +304,7 @@ function Cell({
   container,
   runs,
   retry,
+  cellActions,
 }: {
   root: DashboardRoot;
   dashboardId: string;
@@ -301,6 +317,7 @@ function Cell({
   container: HTMLElement | null;
   runs: Map<string, CellRun>;
   retry: (slotId: string) => void;
+  cellActions?: DashboardProps['cellActions'];
 }) {
   const { state, slot, retryable } = useWidget(root, dashboardId, cell.widget, 'cell', failed.get(slotOf(index, 'cell')), shared, values, runs, slotOf(index, 'cell'));
   const [open, setOpen] = useState(false);
@@ -316,6 +333,7 @@ function Cell({
       state={state === 'placing' ? 'shown' : state}
       texts={texts}
       onRetry={retryable ? () => retry(slotOf(index, 'cell')) : undefined}
+      actions={frame ? cellActions?.({ dashboardId, widgetId: cell.widget.id, role: 'cell' }) : undefined}
       largerView={
         larger
           ? {
@@ -340,6 +358,7 @@ function Cell({
               ) : null,
               onOpenChange: setOpen,
               container,
+              actions: open ? cellActions?.({ dashboardId, widgetId: larger.id, role: 'larger_view' }) : undefined,
             }
           : undefined
       }
