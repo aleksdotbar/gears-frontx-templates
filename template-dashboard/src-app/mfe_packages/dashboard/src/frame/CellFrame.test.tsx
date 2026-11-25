@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -309,5 +309,70 @@ describe('CellFrame', () => {
     const dialog = await screen.findByRole('dialog');
     expect(dialog.textContent).toContain('This widget cannot be shown');
     expect(screen.getByText('chart')).toBeTruthy();
+  });
+
+  describe('the host actions', () => {
+    const namesOf = (buttons: HTMLElement[]) => buttons.map((button) => button.getAttribute('aria-label') ?? button.textContent);
+
+    it('draws each action as a button named by its label before the larger-view button, reached by Tab and run by Enter, Space and a click', async () => {
+      const user = userEvent.setup();
+      const details = vi.fn();
+      const rows = vi.fn();
+      render(
+        <CellFrame title="Orders" state="shown" actions={[{ label: 'Details', onSelect: details }, { label: 'Rows', onSelect: rows }]} largerView={{ title: 'Orders by day', state: 'shown' }}>
+          <p>chart</p>
+        </CellFrame>,
+      );
+      const cell = screen.getByRole('group', { name: 'Orders' });
+      expect(namesOf(within(cell).getAllByRole('button'))).toEqual(['Details', 'Rows', 'Open Orders larger']);
+      await user.tab();
+      expect(document.activeElement).toBe(within(cell).getByRole('button', { name: 'Details' }));
+      await user.keyboard('{Enter}');
+      await user.tab();
+      expect(document.activeElement).toBe(within(cell).getByRole('button', { name: 'Rows' }));
+      await user.keyboard(' ');
+      await user.click(within(cell).getByRole('button', { name: 'Rows' }));
+      expect(details).toHaveBeenCalledTimes(1);
+      expect(rows).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('draws the larger view\'s own actions in the overlay, reached by Shift+Tab from its close button, and keeps the overlay open after one runs', async () => {
+      const user = userEvent.setup();
+      const rows = vi.fn();
+      render(<CellFrame title="Orders" state="shown" largerView={{ title: 'Orders by day', state: 'shown', content: <p>large chart</p>, actions: [{ label: 'Rows', onSelect: rows }] }} />);
+      expect(namesOf(screen.getAllByRole('button'))).toEqual(['Open Orders larger']);
+      await user.click(screen.getByRole('button', { name: 'Open Orders larger' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Orders by day' });
+      const action = within(dialog).getByRole('button', { name: 'Rows' });
+      // The dialog takes focus after it opens; focus moved before that would be taken back.
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+      act(() => within(dialog).getByRole('button', { name: 'Close' }).focus());
+      await user.tab({ shift: true });
+      expect(document.activeElement).toBe(action);
+      await user.keyboard('{Enter}');
+      expect(rows).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole('dialog', { name: 'Orders by day' })).toBeTruthy();
+    });
+
+    it.each([
+      ['no actions', undefined],
+      ['an empty list', []],
+    ])('draws no control of the host for %s', async (_case, actions) => {
+      const user = userEvent.setup();
+      render(<CellFrame title="Orders" state="shown" actions={actions} largerView={{ title: 'Orders by day', state: 'shown', actions }} />);
+      expect(namesOf(screen.getAllByRole('button'))).toEqual(['Open Orders larger']);
+      expect(screen.getByRole('group', { name: 'Orders' }).textContent).toBe('Orders');
+      await user.click(screen.getByRole('button', { name: 'Open Orders larger' }));
+      expect(namesOf(within(await screen.findByRole('dialog')).getAllByRole('button'))).toEqual(['Close']);
+    });
+
+    it('draws the actions of a cell with no title, description or larger view, and none in a frameless cell', () => {
+      const actions = [{ label: 'Rows', onSelect: () => undefined }];
+      const { rerender } = render(<CellFrame state="shown" actions={actions} />);
+      expect(namesOf(screen.getAllByRole('button'))).toEqual(['Rows']);
+      rerender(<CellFrame frame={false} state="shown" actions={actions} />);
+      expect(screen.queryByRole('button')).toBeNull();
+    });
   });
 });
