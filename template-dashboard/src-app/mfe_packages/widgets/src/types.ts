@@ -66,6 +66,8 @@ export interface CartesianPoint {
   y: number | null;
   /** A scatter point only: its size; the point's area grows in proportion to it. */
   size?: number | null;
+  /** A scatter point only: what the point is, such as a repository name, shown in the tooltip, the data view and the text alternative. */
+  label?: string | null;
 }
 
 export interface CartesianData {

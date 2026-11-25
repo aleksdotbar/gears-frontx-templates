@@ -7,7 +7,7 @@ import { DEFAULT_WIDGET_TEXTS } from '../states';
 import { CartesianChart, checkCartesian } from './CartesianChart';
 
 /*
- * The cartesian chart's orientation, percent stack, stack and type of unlisted series, extreme marks, reference lines and bubble sizes.
+ * The cartesian chart's orientation, percent stack, stack and type of unlisted series, extreme marks, reference lines, bubble sizes and point labels.
  * The tests' charts are 640 by 320 pixels (src-app/test-setup.ts).
  */
 
@@ -650,5 +650,76 @@ describe('cartesian_chart bubble sizes', () => {
     expect(checkCartesian({ series: [{ name: 'a', type: 'scatter' }] }, data)).toBeNull();
     expect(checkCartesian({}, { series: [{ name: 'a', points: [{ x: 'Web', y: 1, size: null }] }] })).toBeNull();
     failsWith({ render: { series: [{ name: 'a', type: 'line' }] }, data }, 'only a scatter series takes one');
+  });
+});
+
+describe('cartesian_chart point labels', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // One point per repository: x commits, y reviews, size contributors. The last point has no label.
+  const REPOS: CartesianData = {
+    series: [{ name: 'Repos', points: [{ x: '2026-11-01', y: 10, size: 400, label: 'web' }, { x: '2026-11-02', y: 20, size: 100, label: 'api' }, { x: '2026-11-03', y: 15, size: 25, label: null }] }],
+  };
+  const RENDER: CartesianRender = { x_axis: { type: 'time' }, series: [{ name: 'Repos', type: 'scatter' }], size_label: 'Contributors', drill_down: true };
+  const cells = (table: HTMLElement) => within(table).getAllByRole('row', { hidden: true }).map((row) => [...row.querySelectorAll('th, td')].map((cell) => cell.textContent));
+  const tooltipAt = async (container: HTMLElement, symbol: number) => {
+    fireEvent.mouseEnter(container.querySelectorAll('.recharts-scatter-symbol')[symbol]);
+    fireEvent.mouseMove(container.querySelectorAll('.recharts-scatter-symbol')[symbol]);
+    return waitFor(() => {
+      const text = container.querySelector('.recharts-tooltip-wrapper')?.textContent;
+      expect(text).toContain('Contributors');
+      return text;
+    });
+  };
+
+  it('lists the labels in their own column after the series, in the text alternative and the data view', async () => {
+    const user = userEvent.setup();
+    render(<CartesianChart payload={{ render: RENDER, data: REPOS }} label="Repos" />);
+    const expected = [
+      ['Series', 'Label', 'x', 'y', 'Contributors'],
+      ['Repos', 'web', 'Nov 1, 2026', '10', '400'],
+      ['Repos', 'api', 'Nov 2, 2026', '20', '100'],
+      ['Repos', '', 'Nov 3, 2026', '15', '25'],
+    ];
+    expect(cells(alternative('Repos'))).toEqual(expected);
+    await user.click(screen.getByRole('button', { name: 'Show data' }));
+    const region = await screen.findByRole('region', { name: 'Data of Repos' });
+    expect(within(region).getAllByRole('columnheader').map((cell) => cell.textContent)).toEqual(expected[0]);
+    expect(within(region).getAllByRole('row').map((row) => row.textContent)).toEqual(expect.arrayContaining(['ReposwebNov 1, 202610400']));
+  });
+
+  it('names a labelled point over its values in the tooltip, and gives a point without a label no name', async () => {
+    const { container, unmount } = render(<CartesianChart payload={{ render: RENDER, data: REPOS }} />);
+    expect(await tooltipAt(container, 0)).toMatch(/^webx/);
+    unmount();
+    const again = render(<CartesianChart payload={{ render: RENDER, data: REPOS }} />);
+    expect(await tooltipAt(again.container, 2)).toMatch(/^xNov 3, 2026/);
+    // No empty heading either: the tooltip holds only its value rows.
+    expect(again.container.querySelector('.recharts-tooltip-wrapper > div')?.children).toHaveLength(1);
+  });
+
+  it('lists the label of a scatter series over categories as <series>: Label', () => {
+    const data: CartesianData = {
+      series: [
+        { name: 'Load', points: [{ x: 'Mon', y: 4 }, { x: 'Tue', y: 9 }] },
+        { name: 'Repos', points: [{ x: 'Mon', y: 5, label: 'web' }, { x: 'Tue', y: 8, label: 'api' }] },
+      ],
+    };
+    render(<CartesianChart payload={{ render: { series: [{ name: 'Load', type: 'bar' }, { name: 'Repos', type: 'scatter' }] }, data }} label="Over categories" />);
+    expect(cells(alternative('Over categories'))).toEqual([
+      ['x', 'Load', 'Repos', 'Repos: Label'],
+      ['Mon', '4', '5', 'web'],
+      ['Tue', '9', '8', 'api'],
+    ]);
+  });
+
+  it('fails its own check for a label on a point of a series that is not a scatter', () => {
+    const data: CartesianData = { series: [{ name: 'a', points: [{ x: 'Web', y: 1 }, { x: 'Data', y: 2, label: 'web' }] }] };
+    expect(checkCartesian({ series: [{ name: 'a', type: 'line' }] }, data)).toBe('cartesian_chart: series 0 point 1 has a label, and only a scatter series takes one');
+    // A series without an option draws as bars, so it takes no label either.
+    expect(checkCartesian({}, data)).toContain('series 0 point 1 has a label');
+    expect(checkCartesian({ series: [{ name: 'a', type: 'scatter' }] }, data)).toBeNull();
+    expect(checkCartesian({}, { series: [{ name: 'a', points: [{ x: 'Web', y: 1, label: null }] }] })).toBeNull();
+    failsWith({ render: { series: [{ name: 'a', type: 'bar' }] }, data }, 'only a scatter series takes one');
   });
 });
