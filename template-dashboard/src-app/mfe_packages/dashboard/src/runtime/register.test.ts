@@ -1445,6 +1445,28 @@ describe('the radar_chart data type', () => {
   });
 });
 
+// The cartesian_chart data type on the real store: the optional label of a point.
+describe('the cartesian_chart data type', () => {
+  const CARTESIAN_DATA = 'gts.frontx.dashboard.widget_data.widget_data.v1~frontx.dashboard.widget_data.cartesian_chart.v1~';
+  const problemOf = problemOfFor(CARTESIAN_DATA, 'ab');
+  const withPoint = (point: Record<string, unknown>) => ({ series: [{ name: 'Repos', points: [{ x: 1, y: 2, ...point }] }] });
+
+  it.each([
+    ['a point without a label', withPoint({})],
+    ['a point with a label', withPoint({ label: 'web', size: 3 })],
+    ['a point with a null label', withPoint({ label: null })],
+  ])('takes %s', (_name, data) => {
+    expect(problemOf(data)).toBeNull();
+  });
+
+  it.each([
+    ['a number label', withPoint({ label: 7 }), /\/series\/0\/points\/0\/label is not of type/],
+    ['an extra point field', withPoint({ name: 'web' }), /\/series\/0\/points\/0 Additional property `name`/],
+  ])('fails %s', (_name, data, reason) => {
+    expect(problemOf(data)).toMatch(reason);
+  });
+});
+
 // The funnel_chart data type on the real store: what a transform result must carry, as the root registers it.
 describe('the funnel_chart data type', () => {
   const FUNNEL_DATA = 'gts.frontx.dashboard.widget_data.widget_data.v1~frontx.dashboard.widget_data.funnel_chart.v1~';

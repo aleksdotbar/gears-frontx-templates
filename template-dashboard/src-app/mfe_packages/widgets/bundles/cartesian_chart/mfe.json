@@ -84,6 +84,13 @@
                           ],
                           "minimum": 0,
                           "description": "A scatter series only (on another type, a cross-check the widget runs): the point's size; its area grows in proportion to it, within the radius range the widget sets. Null or absent draws the smallest point."
+                        },
+                        "label": {
+                          "type": [
+                            "string",
+                            "null"
+                          ],
+                          "description": "A scatter series only (on another type, a cross-check the widget runs): what the point is, such as a repository name. On a chart of scatter series only, the tooltip shows it over the point's values. The text alternative and the data view list it in its own column. Null or absent shows none."
                         }
                       }
                     }
