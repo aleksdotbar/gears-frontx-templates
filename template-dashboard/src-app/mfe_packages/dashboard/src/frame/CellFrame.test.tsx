@@ -355,6 +355,40 @@ describe('CellFrame', () => {
       expect(screen.getByRole('dialog', { name: 'Orders by day' })).toBeTruthy();
     });
 
+    it('draws an action with an icon as an icon-only button named by its label, in the cell and in the larger view, run by the keyboard', async () => {
+      const user = userEvent.setup();
+      const details = vi.fn();
+      const actions = [{ label: 'Details', icon: <svg data-testid="details-icon" />, onSelect: details }];
+      render(
+        <CellFrame title="Orders" state="shown" actions={actions} largerView={{ title: 'Orders by day', state: 'shown', actions }}>
+          <p>chart</p>
+        </CellFrame>,
+      );
+      const cell = screen.getByRole('group', { name: 'Orders' });
+      const button = within(cell).getByRole('button', { name: 'Details' });
+      expect(button.textContent).toBe('');
+      expect(within(button).getByTestId('details-icon')).toBeTruthy();
+      expect(namesOf(within(cell).getAllByRole('button'))).toEqual(['Details', 'Open Orders larger']);
+      await user.tab();
+      expect(document.activeElement).toBe(button);
+      await user.keyboard('{Enter}');
+      await user.keyboard(' ');
+      expect(details).toHaveBeenCalledTimes(2);
+
+      await user.click(within(cell).getByRole('button', { name: 'Open Orders larger' }));
+      const dialog = await screen.findByRole('dialog', { name: 'Orders by day' });
+      const overlayButton = within(dialog).getByRole('button', { name: 'Details' });
+      expect(overlayButton.textContent).toBe('');
+      expect(within(overlayButton).getByTestId('details-icon')).toBeTruthy();
+      await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+      act(() => within(dialog).getByRole('button', { name: 'Close' }).focus());
+      await user.tab({ shift: true });
+      expect(document.activeElement).toBe(overlayButton);
+      await user.keyboard('{Enter}');
+      expect(details).toHaveBeenCalledTimes(3);
+      expect(screen.getByRole('dialog', { name: 'Orders by day' })).toBeTruthy();
+    });
+
     it.each([
       ['no actions', undefined],
       ['an empty list', []],
