@@ -228,6 +228,8 @@ describe('the render_widget action', () => {
     ['decimals on a percent', { value_format: { value_type: 'percent', decimals: 0 } }],
     ['a unit label and decimals on a number', { value_format: { value_type: 'number', unit_label: 'lines', decimals: 6 } }],
     ['decimals on a duration', { value_format: { value_type: 'duration', unit: 's', decimals: 1 } }],
+    ['a compound duration', { value_format: { value_type: 'duration', unit: 'h', compound: true } }],
+    ['decimals on a duration that is not compound', { value_format: { value_type: 'duration', unit: 'h', compound: false, decimals: 1 } }],
   ])('accepts a payload with %s', (_name, extra) => {
     expect(() => registry().register(action({ render: { label: 'Deploys' }, ...extra }))).not.toThrow();
   });
@@ -246,6 +248,10 @@ describe('the render_widget action', () => {
     ['an empty unit label', { value_type: 'number', unit_label: '' }, '/payload/value_format/unit_label'],
     ['a unit label of 25 characters', { value_type: 'number', unit_label: 'x'.repeat(25) }, '/payload/value_format/unit_label'],
     ['an extra field', { value_type: 'number', digits: 2 }, '/payload/value_format'],
+    ['compound on a number', { value_type: 'number', compound: true }, '/payload/value_format'],
+    ['compound false on a percent', { value_type: 'percent', compound: false }, '/payload/value_format'],
+    ['decimals on a compound duration', { value_type: 'duration', unit: 'h', compound: true, decimals: 1 }, '/payload/value_format'],
+    ['a compound that is not a boolean', { value_type: 'duration', unit: 'h', compound: 'yes' }, '/payload/value_format/compound'],
   ])('rejects a value_format with %s', (_name, valueFormat, path) => {
     let paths: string[] = [];
     try {
