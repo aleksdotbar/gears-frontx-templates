@@ -265,7 +265,7 @@ describe('requests built from the host variable values', () => {
     const { host, sent } = hostOf({});
     const values = { period: value } as unknown as VariableValues;
     await expect(run(own({ method: 'GET', path: '/n', variables: { period: 'period' } }), host, {}, undefined, values)).rejects.toThrow(
-      new CellFailure('request GET /n: the value of the variable period is not a string, a finite number or a boolean'),
+      new CellFailure('request', 'request GET /n: the value of the variable period is not a string, a finite number or a boolean'),
     );
     expect(sent).toEqual([]);
   });

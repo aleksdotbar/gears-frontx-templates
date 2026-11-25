@@ -12,7 +12,7 @@ import { composeServedFile } from './served';
 const DEMO_SERVED_FILE = composeServedFile(DEMO_WITHOUT_BUNDLES, IN_BUNDLE_PARTS);
 import { SharedRequests } from './binding';
 import { Dashboard, type DashboardProps } from './Dashboard';
-import { DashboardRoot, RENDER_RESERVED_FIELDS } from './DashboardRoot';
+import { DashboardRoot, RENDER_RESERVED_FIELDS, type CellFailureReport } from './DashboardRoot';
 import { fetchHost, type DashboardHost } from './host';
 import { extensionIdOf, renderStampIdOf, stampIdOf } from './ids';
 
@@ -1705,5 +1705,102 @@ describe('variables from the host', () => {
     }
     expect(errors.mock.calls.filter(([line]) => String(line).includes('the render_widget chain ended in fallback'))).toHaveLength(1);
     expect(calls).toBe(1);
+  }, 15_000);
+});
+
+// The host learns why each cell failed through the root's onFailure hook; the viewer sees what they saw without it.
+describe('the onFailure hook', () => {
+  const CANNOT = 'This widget cannot be shown';
+  const DRAWN = 'theme light; language en; data ';
+  const demo = DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } };
+  const heading = demo.layout.cells.find((cell) => cell.widget.id.includes('.markdown_card.'))!;
+  const grid = demo.layout.cells.find((cell) => cell.widget.id.includes('.grid.v1~'))!;
+  const metric = demo.layout.cells.find((cell) => cell.widget.id.includes('.metric_card.'))!;
+  const metricWith = (data: Record<string, unknown>, suffix = 'c001') => ({ ...metric, widget: { ...metric.widget, id: metric.widget.id.replace(/[0-9a-f]{4}$/, suffix), render: {}, data } });
+  /** The demo dashboard with a heading cell, which always shows, and the given cells. */
+  const fileWith = (...cells: unknown[]): ServedFile => ({
+    ...DEMO_SERVED_FILE,
+    instances: [...DEMO_SERVED_FILE.instances.filter((instance) => instance.id !== DEMO_DASHBOARD_ID), { ...demo, layout: { cells: [heading, ...cells] } }],
+  });
+  const refusing = (): MfeEntryLifecycle => ({
+    mount(container, bridge) {
+      bridge.registerActionHandler(RENDER_WIDGET_ACTION_ID, ActionHandler.fromFunction(async () => Promise.reject(new Error('refused'))));
+      container.appendChild(document.createElement('output'));
+    },
+    unmount() {},
+  });
+  // The grid has no in-bundle entry here, so it loads from its bundle, which jsdom cannot fetch.
+  const { [`${ENTRY}grid.v1`]: _grid, ...withoutGrid } = entries;
+  const showWith = (file: ServedFile, cellEntries: typeof entries, onFailure: (failure: CellFailureReport) => void) => {
+    vi.spyOn(MfeHandlerMF.prototype, 'load').mockRejectedValue(new Error('no bundle server in jsdom'));
+    const root = new DashboardRoot({ host: createMockHost({ delayMs: 0, file }), entries: cellEntries, origin: globalThis.location.origin, onFailure });
+    return render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+  };
+
+  it.each([
+    ['registration', 'a widget whose data is no binding', metricWith({ request: null, transform: 'response' }), entries, 'the widget fails its own registration'],
+    ['mount', 'a widget whose bundle does not load', grid, withoutGrid, 'mount_ext failed: Error: no bundle server in jsdom'],
+    ['request', 'a request the host rejects', metricWith({ request: { method: 'GET', path: '/api/demo/broken' }, transform: "{'value': 1}" }), entries, 'request GET /api/demo/broken failed'],
+    ['request', 'a request that names a variable the host does not give', metricWith({ request: { method: 'GET', path: '/api/demo/teams/goals', variables: { team: 'team' } }, transform: "{'value': 1}" }), entries, 'the host gives no value for the variable team'],
+    ['transform', 'a transform that does not parse', metricWith({ params: {}, transform: "{'value': }" }), entries, 'transform does not parse or check'],
+    ['transform', 'a transform that fails', metricWith({ params: {}, transform: "{'value': 1 / 0}" }), entries, 'transform failed'],
+    ['data', 'a transform result that is not an object', metricWith({ params: {}, transform: '1' }), entries, 'the transform result is not an object'],
+    ['data', 'data that fails its data type', metricWith({ params: {}, transform: "{'value': 'seven'}" }), entries, 'the data fails gts.frontx.dashboard.widget_data.widget_data.v1~frontx.dashboard.widget_data.metric_card.v1~'],
+    ['render_widget', 'a widget that refuses render_widget', metricWith({ params: {}, transform: "{'value': 7}" }), { ...entries, [`${ENTRY}metric_card.v1`]: refusing }, 'the render_widget chain ended in fallback'],
+  ] as const)('reports a %s failure for %s once, with the text of its console line, and the viewer sees the same', async (kind, _name, failing, cellEntries, problem) => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reports: CellFailureReport[] = [];
+    const { container } = showWith(fileWith(failing), cellEntries, (failure) => void reports.push(failure));
+    await waitFor(() => expect(shadowTexts(container)).toContain(DRAWN), { timeout: 5000 });
+    await waitFor(() => expect(reports).toHaveLength(1), { timeout: 5000 });
+    expect(screen.getAllByText(CANNOT)).toHaveLength(1);
+    const { id } = failing.widget;
+    expect(reports).toEqual([{ dashboardId: DEMO_DASHBOARD_ID, widgetId: id, widgetType: id.slice(0, id.lastIndexOf('~') + 1), role: 'cell', reason: { kind, message: expect.stringContaining(problem) } }]);
+    const lines = errors.mock.calls.map(([line]) => String(line)).filter((line) => line.includes(id));
+    expect(lines).toEqual([`[dashboard] dashboard ${DEMO_DASHBOARD_ID}, widget ${id} (${reports[0].widgetType}), cell: ${reports[0].reason.message}`]);
+  }, 15_000);
+
+  it('escapes the control characters of a message as its console line does', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reports: CellFailureReport[] = [];
+    const host = { ...createMockHost({ delayMs: 0, file: fileWith(metricWith({ request: { method: 'GET', path: '/api/demo/teams/goals' }, transform: "{'value': 1}" })) }), request: () => Promise.reject(new Error('down\n[dashboard] faked line')) };
+    const root = new DashboardRoot({ host, entries, origin: 'http://localhost', onFailure: (failure) => void reports.push(failure) });
+    render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+    await waitFor(() => expect(reports).toHaveLength(1), { timeout: 5000 });
+    expect(reports[0].reason.message).toBe('request GET /api/demo/teams/goals failed: down\\u000a[dashboard] faked\\u2028line');
+    expect(errors.mock.calls.some(([line]) => String(line).endsWith(`: ${reports[0].reason.message}`))).toBe(true);
+  }, 15_000);
+
+  it('reports a failing larger view with its role when it opens', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const reports: CellFailureReport[] = [];
+    const larger = metricWith({ params: {}, transform: "{'value': 1 / 0}" }, 'c002').widget;
+    showWith(fileWith({ ...metricWith({ params: {}, transform: "{'value': 7}" }), larger_view: larger }), entries, (failure) => void reports.push(failure));
+    await waitFor(() => expect(screen.getByRole('button', { name: /larger/ })).toBeTruthy(), { timeout: 5000 });
+    expect(reports).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: /larger/ }));
+    await waitFor(() => expect(reports).toHaveLength(1), { timeout: 5000 });
+    expect(reports[0]).toMatchObject({ widgetId: larger.id, role: 'larger_view', reason: { kind: 'transform' } });
+    expect(within(await screen.findByRole('dialog')).getByText(CANNOT)).toBeTruthy();
+  }, 15_000);
+
+  it('keeps the dashboard working when the hook throws: the cell fails as without it, its retry runs, and each throw is one console line', async () => {
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const kinds: string[] = [];
+    const onFailure = ({ reason }: CellFailureReport) => {
+      kinds.push(reason.kind);
+      throw new Error('tracker offline\n[dashboard] faked');
+    };
+    const { container } = showWith(fileWith(metricWith({ request: { method: 'GET', path: '/api/demo/broken' }, transform: "{'value': 1}" })), entries, onFailure);
+    await waitFor(() => expect(shadowTexts(container)).toContain(DRAWN), { timeout: 5000 });
+    fireEvent.click(await screen.findByRole('button', { name: /^Try again/ }, { timeout: 5000 }));
+    await waitFor(() => expect(kinds).toEqual(['request', 'request']), { timeout: 5000 });
+    expect(await screen.findByRole('button', { name: /^Try again/ }, { timeout: 5000 })).toBeTruthy();
+    expect(screen.getAllByText(CANNOT)).toHaveLength(1);
+    expect(shadowTexts(container)).toContain(DRAWN);
+    const thrown = errors.mock.calls.map(([line]) => String(line)).filter((line) => line.includes('onFailure'));
+    expect(thrown).toHaveLength(2);
+    expect(thrown[0]).toContain('tracker offline');
+    expect(thrown[0]).not.toContain('faked');
   }, 15_000);
 });

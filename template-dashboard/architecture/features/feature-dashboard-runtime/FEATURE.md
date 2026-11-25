@@ -329,7 +329,7 @@ The placeholder is this feature's name for the cannot-be-shown state: the static
    1. [ ] - `p1` - The root replaces the dashboard-level loader with one placeholder in place of the dashboard and mounts no cell. - `inst-dr-placeholder-dashboard`
 2. [ ] - `p1` - **ELSE** the trigger is at cell level: the root shows the placeholder in that cell, or in the overlay for a larger view, only; the other cells are unaffected. - `inst-dr-placeholder-cell`
 3. [ ] - `p1` - The placeholder is static: no retry, no error text, no failure class; the root localizes it, draws it in its mapped UI-kit scope, and exposes its text to assistive technology. - `inst-dr-placeholder-static`
-4. [ ] - `p1` - Write one diagnostic to the developer log that names the dashboard id, the widget id and widget type, and the failing step or request; the diagnostic is never shown to the viewer. - `inst-dr-placeholder-diagnostic`
+4. [ ] - `p1` - Write one diagnostic to the developer log that names the dashboard id, the widget id and widget type, and the failing step or request; the diagnostic is never shown to the viewer. At cell level, then call the host's `onFailure` hook, if the root has one, with the dashboard id, the widget id and type, the role and the reason: the kind of the failing step and the text of the diagnostic (DESIGN §3.3 Host interface). A hook that throws gets one more diagnostic and changes nothing the viewer sees. - `inst-dr-placeholder-diagnostic`
 5. [ ] - `p1` - **RETURN**. - `inst-dr-placeholder-return`
 
 The triggers, by level:
@@ -586,6 +586,7 @@ The root and widgets **MUST NOT** persist any state: no browser storage and no s
 - [ ] A dashboard id that names no dashboard in the served file shows the dashboard-level cannot-be-shown state with a developer-log diagnostic naming the id.
 - [ ] A registry that rejects the `widgets` domain shows the dashboard-level cannot-be-shown state; a later mount or load shows the same placeholder.
 - [ ] The placeholder is static: no retry, no error text, no failure class; each failure writes one developer-log diagnostic naming the dashboard id, widget id and type, and the failing step or request; it's never shown to the viewer.
+- [ ] A root created with `onFailure` calls it once each time a cell or a larger view shows the cannot-be-shown state, with the dashboard id, the widget id and type, the role, and a reason whose kind is `registration`, `mount`, `request`, `transform`, `data` or `render_widget` and whose message is the text of the diagnostic. A hook that throws writes one diagnostic, and the failed cell, its retry button and the other cells show as they do without the hook.
 - [ ] The root maps the host theme id to a UI-kit scope for its own chrome (cell frame, loaders, overlay, close button) and localizes its own text for the host language.
 - [ ] In an MFE, the root reads the theme and language through the bridge's `getProperty`; in a single-page application, from the application.
 - [ ] On the DESIGN §4.1 reference dashboard, under the reference conditions with the test stub API, over at least 30 runs, the complete dashboard shows within 3 s at p95 (provisional).
