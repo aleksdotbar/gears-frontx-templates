@@ -7,7 +7,7 @@ import { DEFAULT_WIDGET_TEXTS } from '../states';
 import { CartesianChart, checkCartesian } from './CartesianChart';
 
 /*
- * The cartesian chart's orientation, percent stack, stack of unlisted series, extreme marks, reference lines and bubble sizes.
+ * The cartesian chart's orientation, percent stack, stack and type of unlisted series, extreme marks, reference lines and bubble sizes.
  * The tests' charts are 640 by 320 pixels (src-app/test-setup.ts).
  */
 
@@ -252,6 +252,52 @@ describe('cartesian_chart stack of unlisted series', () => {
     const negative: CartesianData = { series: [OUTCOMES.series[0], { name: 'failed', points: [{ x: 'Web', y: 4 }, { x: 'Data', y: -1 }] }] };
     expect(checkCartesian({ stack_mode: 'percent', unlisted_stack_group: 'outcome' }, negative)).toBe('cartesian_chart: series 1 point 1 is negative, and a percent stack takes no negative value');
     failsWith({ render: { stack_mode: 'percent', unlisted_stack_group: 'outcome' }, data: negative }, 'series 1 point 1 is negative');
+  });
+});
+
+describe('cartesian_chart type of unlisted series', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  // One series per value of a repository column: the names come only with the data.
+  const REPOS: CartesianData = {
+    series: [
+      { name: 'web', points: [{ x: 'Mon', y: 12 }, { x: 'Tue', y: 30 }, { x: 'Wed', y: 6 }] },
+      { name: 'api', points: [{ x: 'Mon', y: 4 }, { x: 'Tue', y: 10 }, { x: 'Wed', y: 2 }] },
+    ],
+  };
+  const WITH_TARGET: CartesianData = { series: [...REPOS.series, { name: 'Target', points: [{ x: 'Mon', y: 20 }, { x: 'Tue', y: 20 }, { x: 'Wed', y: 20 }] }] };
+  const SIZED: CartesianData = {
+    series: [
+      { name: 'web', points: [{ x: 1, y: 10, size: 400 }, { x: 3, y: 15, size: 25 }] },
+      { name: 'api', points: [{ x: 2, y: 20, size: 100 }] },
+    ],
+  };
+  const entries = (type: CartesianSeriesOption['type'], extra: Partial<CartesianSeriesOption> = {}) => ['web', 'api'].map((name): CartesianSeriesOption => ({ name, type, ...extra }));
+
+  /** What a viewer gets from a chart: the drawing with Recharts' own element ids left out, and the rows of the text alternative. */
+  const viewOf = (options: CartesianRender, data: CartesianData) => {
+    const { container, unmount } = render(<CartesianChart payload={{ render: options, data }} label="Commits" />);
+    const drawing = container.querySelector('.recharts-wrapper')!.outerHTML.replace(/recharts\d+-clip|_r_\w+?_/g, 'id');
+    const alternativeRows = within(alternative('Commits')).getAllByRole('row', { hidden: true }).map((row) => row.textContent);
+    unmount();
+    return { drawing, alternativeRows };
+  };
+
+  it.each([
+    ['as lines', { unlisted_type: 'line' }, REPOS, { series: entries('line') }, '.recharts-line-curve'],
+    ['as areas stacked in unlisted_stack_group', { unlisted_type: 'area', unlisted_stack_group: 'repo' }, REPOS, { series: entries('area', { stack_group: 'repo' }) }, '.recharts-area-curve'],
+    ['as lines beside a named bar, which keeps its own type', { unlisted_type: 'line', series: [{ name: 'Target', type: 'bar' }] }, WITH_TARGET, { series: [{ name: 'Target', type: 'bar' }, ...entries('line')] }, '.recharts-bar-rectangle'],
+    ['as sized scatter points on a value x axis', { unlisted_type: 'scatter', x_axis: { type: 'value' } }, SIZED, { series: entries('scatter'), x_axis: { type: 'value' } }, '.recharts-scatter-symbol'],
+  ] as const)('draws the series without an entry %s, as named entries of that type', (_name, unlisted, data, named, mark) => {
+    const view = viewOf(unlisted as CartesianRender, data);
+    expect(view.drawing).toContain(mark.slice(1));
+    expect(view).toEqual(viewOf(named as CartesianRender, data));
+  });
+
+  it('takes a size on a point of an unlisted scatter series, and fails one on an unlisted line', () => {
+    expect(checkCartesian({ unlisted_type: 'scatter', x_axis: { type: 'value' } }, SIZED)).toBeNull();
+    expect(checkCartesian({ unlisted_type: 'line', x_axis: { type: 'value' } }, SIZED)).toBe('cartesian_chart: series 0 point 0 has a size, and only a scatter series takes one');
+    failsWith({ render: { unlisted_type: 'line', x_axis: { type: 'value' } }, data: SIZED }, 'only a scatter series takes one');
   });
 });
 

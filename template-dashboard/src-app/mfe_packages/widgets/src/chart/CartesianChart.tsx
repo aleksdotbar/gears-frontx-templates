@@ -47,13 +47,14 @@ const placeOf = (x: string | number | null, axis: 'category' | 'value' | 'time')
 const placeKey = (x: string | number | null) => `${typeof x}:${String(x)}`;
 
 /**
- * How a data series is drawn: its entry in `render.series`. A series without an entry draws as bars on the primary
- * axis, in `unlisted_stack_group` when the render sets it, so every view and check takes it as a member of that group.
+ * How a data series is drawn: its entry in `render.series`. A series without an entry draws as `unlisted_type` (bars
+ * without it) on the primary axis, in `unlisted_stack_group` when the render sets it, so every view and check takes it as
+ * an entry of that type and group.
  */
 function seriesOptionOf(render: CartesianRender, name: string | null): CartesianSeriesOption | undefined {
   const option = render.series?.find((series) => series.name === name);
-  if (option || render.unlisted_stack_group === undefined) return option;
-  return { name: name ?? '', type: 'bar', stack_group: render.unlisted_stack_group };
+  if (option || (render.unlisted_type === undefined && render.unlisted_stack_group === undefined)) return option;
+  return { name: name ?? '', type: render.unlisted_type ?? 'bar', stack_group: render.unlisted_stack_group };
 }
 
 // @cpt-algo:cpt-frontx-dashboard-algo-widget-catalog-cartesian-checks:p2
