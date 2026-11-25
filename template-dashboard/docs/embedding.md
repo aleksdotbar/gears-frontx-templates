@@ -71,7 +71,7 @@ A minimal product entry that exports only `Dashboard`, `DashboardRoot` and `fetc
 
 ## Actions of the product on a cell
 
-The product can put its own actions on a cell and on the cell's larger view, for example a view of the rows behind a widget. It passes `cellActions` to `<Dashboard>`: a function that gets the place (`dashboardId`, `widgetId`, and `role`, which is `cell` or `larger_view`) and returns the actions there, each a `label` and an `onSelect` callback. An empty list shows no action.
+The product can put its own actions on a cell and on the cell's larger view, for example a view of the rows behind a widget. It passes `cellActions` to `<Dashboard>`: a function that gets the place (`dashboardId`, `widgetId`, and `role`, which is `cell` or `larger_view`) and returns the actions there, each a `label`, an `onSelect` callback and an optional `icon`. An empty list shows no action.
 
 ```tsx
 const [rowsOf, setRowsOf] = useState<string>();
@@ -88,7 +88,7 @@ const [rowsOf, setRowsOf] = useState<string>();
 
 `RowsDialog` and `canSeeRows` stand for the product's own dialog and access check. `widgetId` is the `id` of the widget instance in the dashboard JSON: the cell's `widget`, or its `larger_view` for the larger view. The product maps it to its own records.
 
-The frame draws each action as a kit `Button` whose text and accessible name are the label: in the cell header before the larger-view button, and in the larger view's overlay header under the title. A cell with a title is a group named by that title, and the overlay is a dialog named by the larger-view title, so a screen reader hears where an action belongs. The root asks for the actions on each render of a cell with a frame, and of a larger view only while it is open. A cell with `frame` `false` has no header, so it shows no action. The label is the product's text, in the host language. The chart widgets have a "Show data" button of their own, for their data view, so give an action a different label.
+The frame draws each action as a kit `Button` whose accessible name is the label: in the cell header before the larger-view button, and in the larger view's overlay header under the title. Without an `icon`, the button shows the label. With an `icon`, a React node such as a `lucide-react` icon, the button shows only the icon, as the larger-view button does. A cell with a title is a group named by that title, and the overlay is a dialog named by the larger-view title, so a screen reader hears where an action belongs. The root asks for the actions on each render of a cell with a frame, and of a larger view only while it is open. A cell with `frame` `false` has no header, so it shows no action. The label is the product's text, in the host language. The chart widgets have a "Show data" button of their own, for their data view, so give an action a different label.
 
 The root keeps none of the product's state. It calls `onSelect`, and what follows is the product's. A kit `Dialog` that the product opens from an action in the larger view opens over it, and closing the product's dialog leaves the larger view open.
 
