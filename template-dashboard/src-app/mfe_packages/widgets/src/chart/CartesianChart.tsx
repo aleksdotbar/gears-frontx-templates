@@ -1,4 +1,4 @@
-import { Area, Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, Scatter, ScatterChart, XAxis, YAxis, ZAxis, usePlotArea, useYAxisScale, type LabelProps } from 'recharts';
+import { Area, Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, Scatter, ScatterChart, XAxis, YAxis, ZAxis, getNiceTickValues, usePlotArea, useYAxisScale, type LabelProps } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@gears-frontx/ui-kit';
 import type { RenderWidgetPayload } from '@gears-frontx/frontx-dashboard-root/contract';
 
@@ -17,8 +17,11 @@ import { isCompact, isLaidOut, useElementSize } from './size';
 const MIN_LABELLED_BAR = 28;
 const PRIMARY_AXIS_WIDTH = 44;
 const SECONDARY_AXIS_WIDTH = 44;
-// A rotated tick stays on one line: Recharts wraps tick text to the slot width, which breaks a rotated label into overlapping lines.
-const ROTATED_TICK = { ...TICK, width: 10_000 };
+// WORKAROUND: Recharts measures tick text at the page's font size, larger than the kit's tick size, and wraps it at the
+// axis width: a rotated label breaks into overlapping lines and a two-part duration onto two. These ticks stay on one line.
+const ONE_LINE_TICK = { ...TICK, width: 10_000 };
+// INVARIANT: Recharts draws a y tick's text this far from the plot, so an axis is its longest tick text wide and this.
+const VALUE_TICK_GAP = 8;
 // The heights of a value label and of an end label line, at the micro text size, with the value label's offset.
 const VALUE_LABEL_HEIGHT = 12;
 const END_LABEL_HEIGHT = 12;
@@ -471,8 +474,49 @@ export function CartesianChart({
             : { angle: side === 'primary' ? -90 : 90, position: side === 'primary' ? ('insideLeft' as const) : ('insideRight' as const), offset: 8, style: { textAnchor: 'middle' as const } }),
         }
       : undefined;
-  const primaryWidth = PRIMARY_AXIS_WIDTH + (render.y_axis?.label ? AXIS_TITLE : 0);
-  const secondaryWidth = SECONDARY_AXIS_WIDTH + (render.y_axis_secondary?.label ? AXIS_TITLE : 0);
+  const scatterOnly = axis !== 'category' && data.series.every((series) => typeOf(series.name) === 'scatter');
+  const percent = render.stack_mode === 'percent';
+  // An axis that carries a stack group shows shares under a percent stack (the check keeps every series there in a group).
+  const percentAxis = (side: 'primary' | 'secondary') =>
+    percent && data.series.some((series, index) => optionOf(series.name)?.stack_group !== undefined && typeOf(series.name) !== 'scatter' && (onSecondary(index) ? 'secondary' : 'primary') === side);
+  const valueTickText = (side: 'primary' | 'secondary') => (value: number) =>
+    side === 'primary' ? formatValue(value, value_format, locale, 'compact') : `${formatValue(value, undefined, locale, 'compact')}${unit}`;
+  const valueAxisWidth = (side: 'primary' | 'secondary') => {
+    const options = side === 'primary' ? render.y_axis : render.y_axis_secondary;
+    const title = options?.label ? AXIS_TITLE : 0;
+    const base = side === 'primary' ? PRIMARY_AXIS_WIDTH : SECONDARY_AXIS_WIDTH;
+    if (percentAxis(side)) return base + title;
+    const values: number[] = [];
+    const sums = new Map<string, number>();
+    data.series.forEach((series, index) => {
+      if ((onSecondary(index) ? 'secondary' : 'primary') !== side) return;
+      const option = optionOf(series.name);
+      const type = typeOf(series.name);
+      const group = option?.stack_group !== undefined && type !== 'scatter' ? `${type === 'line' ? 'line' : 'fill'}:${option.stack_group}` : undefined;
+      for (const point of series.points) {
+        if (point.y === null || (axis !== 'category' && point.x === null)) continue;
+        if (group === undefined) {
+          values.push(point.y);
+          continue;
+        }
+        const key = `${group}:${point.y < 0 ? 'fall' : 'rise'}:${placeKey(placeOf(point.x, axis))}`;
+        sums.set(key, (sums.get(key) ?? 0) + point.y);
+      }
+    });
+    for (const line of render.reference_lines ?? []) if ((line.axis ?? 'y') === (side === 'primary' ? 'y' : 'y_secondary') && typeof line.value === 'number') values.push(line.value);
+    const drawn = [...values, ...sums.values()].filter(Number.isFinite);
+    if (drawn.length === 0) return base + title;
+    const log = options?.type === 'log';
+    const fromZero = !scatterOnly && !log;
+    const low = drawn.reduce((min, value) => Math.min(min, value), fromZero ? 0 : Infinity);
+    const high = drawn.reduce((max, value) => Math.max(max, value), fromZero ? 0 : -Infinity);
+    // INVARIANT: 5 and true are the YAxis defaults of tickCount and allowDecimals, so these are the ticks Recharts draws.
+    const ticks = log ? [low, high] : getNiceTickValues([low, high], 5, true);
+    const longest = ticks.reduce((most, value) => Math.max(most, valueTickText(side)(value).length), 0);
+    return Math.max(base, Math.min(Math.ceil(longest * TICK_CHAR_WIDTH) + VALUE_TICK_GAP, Math.round(width / 3))) + title;
+  };
+  const primaryWidth = valueAxisWidth('primary');
+  const secondaryWidth = valueAxisWidth('secondary');
   const xTitle = render.x_axis?.label ? AXIS_TITLE : 0;
   // tick_angle turns the x ticks under the plot; a horizontal chart writes its categories level beside it.
   const angle = compact || render.orientation === 'horizontal' ? 0 : (render.x_axis?.tick_angle ?? 0);
@@ -482,11 +526,11 @@ export function CartesianChart({
   const xAxisHeight = (longest: number) => (angle === 0 ? 30 : Math.ceil(longest * TICK_CHAR_WIDTH * sine) + 16) + xTitle;
   // A rotated label runs left of its tick: the first one's label can pass the y axis, so the chart keeps that room and the plot is narrower by it.
   const overhangOf = (firstLabel: number) => (angle === 0 ? 0 : Math.max(0, Math.ceil(firstLabel * TICK_CHAR_WIDTH * Math.cos((Math.abs(angle) * Math.PI) / 180)) - primaryWidth));
-  const xTick = { angle, tick: angle === 0 ? TICK : ROTATED_TICK, textAnchor: angle === 0 ? ('middle' as const) : ('end' as const) };
+  const xTick = { angle, tick: angle === 0 ? TICK : ONE_LINE_TICK, textAnchor: angle === 0 ? ('middle' as const) : ('end' as const) };
 
   // Scatter series on a value or time x axis carry their own x and y per point, so the chart draws each series on two value axes.
   // On a category axis they draw as points over the categories of the composed chart below.
-  if (axis !== 'category' && data.series.every((series) => typeOf(series.name) === 'scatter')) {
+  if (scatterOnly) {
     // On a time axis an ISO x becomes epoch milliseconds, so every view of it shows the same localized date.
     const xOf = (x: string | number | null) => placeOf(x, axis);
     const table: ValuesTable = {
@@ -524,7 +568,7 @@ export function CartesianChart({
                 <XAxis type="number" dataKey="x" name={xLabel} domain={['dataMin', 'dataMax']} padding={bubblePadding.x} tickLine={false} axisLine={false} tickFormatter={(value: number) => tickText(value)} height={xAxisHeight(table.rows.reduce((max, row) => Math.max(max, tickText(row[1]).length), 0))} label={titleOf(render.x_axis?.label, 'x')} {...xTick} />
                 <YAxis
                   yAxisId="primary"
-                  tick={TICK}
+                  tick={ONE_LINE_TICK}
                   type="number"
                   dataKey="y"
                   name={render.y_axis?.label}
@@ -535,12 +579,12 @@ export function CartesianChart({
                   scale={render.y_axis?.type === 'log' ? 'log' : 'auto'}
                   domain={['auto', 'auto']}
                   padding={bubblePadding.y}
-                  tickFormatter={(value: number) => formatValue(value, value_format, locale, 'compact')}
+                  tickFormatter={valueTickText('primary')}
                 />
                 {scatterSecondary ? (
                   <YAxis
                     yAxisId="secondary"
-                    tick={TICK}
+                    tick={ONE_LINE_TICK}
                     orientation="right"
                     type="number"
                     dataKey="y"
@@ -552,7 +596,7 @@ export function CartesianChart({
                     scale={render.y_axis_secondary?.type === 'log' ? 'log' : 'auto'}
                     domain={['auto', 'auto']}
                     padding={bubblePadding.y}
-                    tickFormatter={(value: number) => `${formatValue(value, undefined, locale, 'compact')}${unit}`}
+                    tickFormatter={valueTickText('secondary')}
                   />
                 ) : null}
                 <ChartTooltip
@@ -605,7 +649,6 @@ export function CartesianChart({
 
   const rows = rowsOf(data, axis);
   const horizontal = render.orientation === 'horizontal';
-  const percent = render.stack_mode === 'percent';
   drawnValues(rows, data, axis, optionOf, (index) => (onSecondary(index) ? render.y_axis_secondary?.type : render.y_axis?.type) === 'log', percent);
   // The sizes of the scatter series that carry them, on the row of their x, for the bubbles, the tooltip and the data view.
   const sizedSeries = data.series.flatMap((series, index) => (typeOf(series.name) === 'scatter' && series.points.some((point) => typeof point.size === 'number') ? [index] : []));
@@ -638,9 +681,6 @@ export function CartesianChart({
   };
   const formatColumn = (column: number) => (value: string | number | null) => (column === 0 ? xText(value) : column <= data.series.length ? formatSeries(column - 1)(value) : formatSize(value));
   const secondary = data.series.some((_, index) => onSecondary(index));
-  // An axis that carries a stack group shows shares under a percent stack (the check keeps every series there in a group).
-  const percentAxis = (side: 'primary' | 'secondary') =>
-    percent && data.series.some((series, index) => optionOf(series.name)?.stack_group !== undefined && typeOf(series.name) !== 'scatter' && (onSecondary(index) ? 'secondary' : 'primary') === side);
   const share = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
 
   // Value labels: `auto` writes them when each bar is wide enough. Bars of one stack share a slot; Recharts gives the slots 80% of a category.
@@ -722,8 +762,7 @@ export function CartesianChart({
       axisLine: false,
       scale: log ? ('log' as const) : ('auto' as const),
       domain: percentAxis(side) ? [0, 1] : log ? ['auto', 'auto'] : undefined,
-      tickFormatter: (value: number) =>
-        percentAxis(side) ? formatShare(share, value) : side === 'primary' ? formatValue(value, value_format, locale, 'compact') : `${formatValue(value, undefined, locale, 'compact')}${unit}`,
+      tickFormatter: (value: number) => (percentAxis(side) ? formatShare(share, value) : valueTickText(side)(value)),
     };
     if (horizontal)
       return (
@@ -746,6 +785,7 @@ export function CartesianChart({
         width={side === 'primary' ? primaryWidth : secondaryWidth}
         label={titleOf(options?.label, side)}
         {...common}
+        tick={ONE_LINE_TICK}
       />
     );
   };
