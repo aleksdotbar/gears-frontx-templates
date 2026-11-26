@@ -324,11 +324,13 @@ export function GridWidget({
   if (problem) return <WidgetCannotBeShown texts={texts} problem={problem} />;
   if (rows.length === 0) return <WidgetEmpty texts={texts} />;
   const excluded = render.columns.flatMap((column, index) => (isSortable(column) ? [] : [columnId(index)]));
+  // INVARIANT: with no floor variable the kit's own floor, max-content, keeps every value of a content-sized column on one line.
+  const fitContent = render.column_widths === 'content';
   return (
-    <div ref={setRoot} className={styles.grid} style={{ '--data-grid-table-min-inline-size': `${tableFloorOf(render.columns)}px` } as CSSProperties}>
+    <div ref={setRoot} className={styles.grid} style={fitContent ? undefined : ({ '--data-grid-table-min-inline-size': `${tableFloorOf(render.columns)}px` } as CSSProperties)}>
       {/* The kit keeps loaded records and its pager size, and reloads on neither a new load nor new limits: new rows or new page sizes remount the grid, which starts it again unsorted on page 1. A new language does not: the columns render it, and the sort and page stay; text already on the page keeps the old language's collation until the next sort or page. */}
       <GridTexts.Provider value={texts}>
-        <DataGrid<RowItem> key={`${dataVersion}:${sizes.join(',')}:${render.search ? 'search' : ''}`} name={name} label={label} load={load} columns={columns} persistent="memory" stickyHeader portalContainer={container ?? undefined}>
+        <DataGrid<RowItem> key={`${dataVersion}:${sizes.join(',')}:${render.search ? 'search' : ''}`} name={name} label={label} load={load} columns={columns} persistent="memory" tableLayout={fitContent ? 'auto' : 'fixed'} stickyHeader portalContainer={container ?? undefined}>
           {render.search ? <GridSearchPlugin /> : null}
           <DataGridPaginationPlugin defaultLimit={sizes[0]} limits={sizes} />
           <DataGridOrderPlugin excludedColumns={excluded} />

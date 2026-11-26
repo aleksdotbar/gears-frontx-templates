@@ -1171,7 +1171,7 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
                 "description": "Unique column key. column_groups[].members and row_color refer to this key."
               },
               "title": { "type": "string", "description": "Optional heading." },
-              "width": { "type": "integer", "minimum": 1, "description": "Optional width in pixels. The table is at least as wide as the sum of its column widths, counting 160 pixels for a column without one; a grid wider than its cell scrolls sideways inside it." },
+              "width": { "type": "integer", "minimum": 1, "description": "Optional width in pixels. The table is at least as wide as the sum of its column widths, counting 160 pixels for a column without one; a grid wider than its cell scrolls sideways inside it. With column_widths content, a width is the column's least width, and a wider value widens it." },
               "format": {
                 "type": "object",
                 "additionalProperties": false,
@@ -1217,7 +1217,8 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
           "pattern": "^[a-z][a-z0-9_]{0,63}$",
           "description": "Optional column key. Its value in a row names the row colour: success, warning, error, or info."
         },
-        "search": { "type": "boolean", "default": false, "description": "Optional search box above the grid. It keeps the rows whose shown text (formatted numbers, badge text, progress percents and link text; sparklines are not searched) contains the typed text, ignoring case, in any column, and shows the first page. Without it, false." }
+        "search": { "type": "boolean", "default": false, "description": "Optional search box above the grid. It keeps the rows whose shown text (formatted numbers, badge text, progress percents and link text; sparklines are not searched) contains the typed text, ignoring case, in any column, and shows the first page. Without it, false." },
+        "column_widths": { "enum": ["shared", "content"], "default": "shared", "description": "Optional way the columns get their widths. shared (the default): the columns share the grid's width, each column's width is its track, and a long value wraps. content: each column is as wide as its widest value or its title, every value stays on one line, and a grid wider than its cell scrolls sideways inside it." }
       }
     }
   ],
@@ -1281,6 +1282,7 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
 - Data schema change: the grid data type's row item takes a list (`{ "type": "array", "maxItems": 60, "items": { "type": ["number", "null"] } }`) besides text, a number, null and a link, for sparkline columns. A list of more than 60 points fails data validation; a list in any other column fails the grid's own check.
 - Search: with `search` true, a search box named by the widget texts ("Search the table") stands above the grid, reachable by Tab with the kit's visible focus ring. Typing keeps the rows whose shown text contains the typed text (spaces at its ends ignored), ignoring case, in any column: formatted numbers, badge text, progress percents and link text; sparklines are not searched. Each new query keeps the sort and shows the first page, client-side, sending no request. A search that keeps no row shows the widget text "No rows match the search". Without `search`, no box shows.
 - Links: a value `{text, href}` goes through the shared link rule of the widgets (see Cross-type rules): `https`, `http`, `mailto` and a path from the site root (`/x`, not `//x`) show as a link with its `text`; any other target shows `text` as plain text with one console line naming only the kind of target. A link to another origin opens in a new tab with `rel="noopener noreferrer"` and says so in its accessible name; any other link opens in the same tab. A link sorts by its text. A link value in a badge column shows its text as a badge, with no link.
+- Column widths: with `column_widths` `shared` (the default), the ui-kit DataGrid uses its fixed table layout: the columns share the grid's width, a column's `width` is its track, and a long value wraps. With `content`, the DataGrid uses its auto table layout with the kit's own table floor (`max-content`): each column is as wide as its widest value or its title, every value stays on one line, and a grid wider than its cell scrolls sideways inside it. A column `width` is then the column's least width.
 - Paging: the grid always shows one page. The viewer pages and changes the page size client-side, sending no request. The pager shows the position and the total.
 - Sorting: one active sort column, following the header cycle of the ui-kit DataGrid: descending, ascending, then the delivered order; only that header shows a sort state, exposed with `aria-sort`. Sorting is client-side over the rows the transform delivered. The comparison, null placement, stability and the reset to the first page follow `cpt-frontx-dashboard-algo-widget-catalog-grid-sort`.
 - Frozen columns: the first `frozen_columns` columns stay visible at the leading edge while the viewer scrolls horizontally. A value larger than the number of columns freezes all columns. A group is frozen as a whole, so a count that ends inside a group freezes the whole group.
@@ -2246,6 +2248,7 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
 - [ ] Given a `grid` whose sortable column holds, in delivered rows r1 to r7, the values 10, "Banana", null, 2, "apple", 2, and null, with host language English, when the viewer sorts ascending, then the row order is r4, r6, r1, r5, r2, r3, r7 (numbers numerically, then strings by the collator, then nulls; equal values keep delivered order). When the viewer sorts descending, then the row order is r1, r4, r6, r2, r5, r3, r7 (nulls stay last).
 - [ ] Given a `grid` on its third page, when the viewer sorts by a column, then the grid shows the first page. Given a `grid` on its third page, when the viewer changes the page size, then the grid shows the first page.
 - [ ] Given a `grid`, when the viewer changes the page or page size, then the grid pages in place, sending no request.
+- [ ] Given a `grid` with `column_widths` `content` in a cell narrower than its values, when it renders, then each column is as wide as its widest value, no value wraps, and the grid scrolls sideways inside the cell.
 - [ ] Given a `grid` with no rows, then it shows "No data to show".
 - [ ] Given a `grid` whose data has more than 500 rows, then it fails data validation and the cell shows the cannot-be-shown state; rows are never truncated.
 - [ ] Given a `grid` page of 500 rows, when the viewer scrolls from the first row to the last, then the view stays responsive in the light and the dark scope (`cpt-frontx-dashboard-nfr-large-table`).
