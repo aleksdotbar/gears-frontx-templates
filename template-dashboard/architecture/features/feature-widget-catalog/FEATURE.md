@@ -2213,7 +2213,7 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
 **Cross-references**:
 - Rendering: the card renders right after `render_widget`, with no data states, and sends no request.
 - Markdown: the body is typical markdown, CommonMark including links and images. The card shows the formatting, the links, and the images.
-- Reading width: the body runs in lines of at most 65 characters (65 `ch` of the body text), from the start of the cell, however wide the cell is, so a paragraph in a large cell stays readable.
+- Reading width: each block of the body other than a heading runs in lines of at most 65 characters (65 `ch` of the body text), from the start of the cell, however wide the cell is, so a paragraph in a large cell stays readable. A heading runs the full width of the cell.
 - Safety: embedded HTML, links and images follow `cpt-frontx-dashboard-algo-widget-catalog-markdown`.
 - Other widgets: the markdown card is the only widget that interprets markup. Every other delivered text is rendered as text.
 
