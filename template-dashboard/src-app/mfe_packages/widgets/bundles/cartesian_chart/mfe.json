@@ -190,7 +190,7 @@
                     "every"
                   ],
                   "default": "auto",
-                  "description": "auto skips tick labels that would collide; every labels each category, thinning out to every second, third and so on only when the labels cannot fit; a value or time axis has no categories, so there every acts as auto. Without it, auto."
+                  "description": "auto skips tick labels that would collide, and on a category axis keeps the first and the last category labelled; every labels each category, thinning out to every second, third and so on only when the labels cannot fit; a value or time axis has no categories, so there every acts as auto. Without it, auto."
                 },
                 "tick_angle": {
                   "enum": [

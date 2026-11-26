@@ -32,7 +32,7 @@ export interface CartesianRender {
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;
-    /** `auto` skips labels that would collide; `every` labels every category, thinning out only when they cannot fit. */
+    /** `auto` skips labels that would collide and keeps the first and the last category labelled; `every` labels every category, thinning out only when they cannot fit. */
     tick_labels?: 'auto' | 'every';
     tick_angle?: 0 | -45 | -90;
   };
