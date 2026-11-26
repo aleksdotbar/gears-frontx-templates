@@ -18,6 +18,7 @@ import {
   Text,
 } from '@gears-frontx/ui-kit';
 
+import type { CellFailureKind } from '../contract';
 import styles from './frame.module.css';
 
 /** The cell load state the root owns. The widget's own empty state is `shown` for the root. */
@@ -27,6 +28,11 @@ export type CellState = 'loading' | 'shown' | 'cannot-be-shown';
 export interface FrameTexts {
   loading: string;
   cannotBeShown: string;
+  /**
+   * The text a cell or a larger view shows in place of `cannotBeShown` for a failure of one kind, such as `request`.
+   * Optional, and so is each kind; a kind without a text, or with a blank one, shows `cannotBeShown`.
+   */
+  cannotBeShownFor?: Partial<Record<CellFailureKind, string>>;
   openLarger: (title: string) => string;
   close: string;
   /**
@@ -45,11 +51,18 @@ export interface FrameTexts {
 export const DEFAULT_FRAME_TEXTS: Required<FrameTexts> = {
   loading: 'Loading',
   cannotBeShown: 'This widget cannot be shown',
+  cannotBeShownFor: {},
   openLarger: (title) => (title ? `Open ${title} larger` : 'Open larger view'),
   close: 'Close',
   retry: 'Try again',
   retryNamed: (title) => (title ? `Try again to load ${title}` : 'Try again'),
 };
+
+/** The cannot-be-shown text of a failure of this kind: the kind's own text when the host gives one, else the plain one. */
+function cannotBeShownText(texts: FrameTexts, failure: CellFailureKind | undefined) {
+  const own = failure === undefined ? undefined : texts.cannotBeShownFor?.[failure];
+  return own?.trim() ? own : texts.cannotBeShown;
+}
 
 /** The retry button's visible text and accessible name in a cell with this title (empty for none). */
 export function retryTexts(texts: FrameTexts, title: string) {
@@ -115,6 +128,7 @@ export function useRetryFocus(state: CellState, onRetry: (() => void) | undefine
  */
 export function StateBody({
   state,
+  failure,
   texts,
   children,
   onRetry,
@@ -122,6 +136,8 @@ export function StateBody({
   retryRef,
 }: {
   state: CellState;
+  /** The kind of the failure in the cannot-be-shown state, which picks its text. */
+  failure?: CellFailureKind;
   texts: FrameTexts;
   children?: ReactNode;
   onRetry?: () => void;
@@ -140,7 +156,7 @@ export function StateBody({
   if (state === 'cannot-be-shown') {
     const text = (
       <Text tone="muted" render={<p />} className={styles.cannot}>
-        {texts.cannotBeShown}
+        {cannotBeShownText(texts, failure)}
       </Text>
     );
     if (!onRetry) return text;
@@ -179,6 +195,7 @@ export function CellFrame({
   title,
   description,
   state,
+  failure,
   children,
   largerView,
   texts = DEFAULT_FRAME_TEXTS,
@@ -193,6 +210,8 @@ export function CellFrame({
   /** A short line under the title, one line with an ellipsis; without it the header shows the title alone. */
   description?: string;
   state: CellState;
+  /** The kind of the failure in the cannot-be-shown state, which picks its text from `texts.cannotBeShownFor`. */
+  failure?: CellFailureKind;
   children?: ReactNode;
   largerView?: LargerView;
   texts?: FrameTexts;
@@ -201,7 +220,7 @@ export function CellFrame({
   if (!frame) {
     return (
       <div ref={focus.wrapper} tabIndex={-1} data-cell-frame="none" className={styles.frameless} aria-busy={state === 'loading' || undefined}>
-        <StateBody state={state} texts={texts} onRetry={focus.retry} retryRef={focus.button}>
+        <StateBody state={state} failure={failure} texts={texts} onRetry={focus.retry} retryRef={focus.button}>
           {children}
         </StateBody>
       </div>
@@ -248,7 +267,7 @@ export function CellFrame({
         </CardHeader>
       ) : null}
       <CardContent className={styles.body}>
-        <StateBody state={state} texts={texts} onRetry={focus.retry} title={title} retryRef={focus.button}>
+        <StateBody state={state} failure={failure} texts={texts} onRetry={focus.retry} title={title} retryRef={focus.button}>
           {children}
         </StateBody>
       </CardContent>

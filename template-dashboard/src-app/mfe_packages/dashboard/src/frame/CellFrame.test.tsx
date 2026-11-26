@@ -18,6 +18,26 @@ describe('CellFrame', () => {
     expect(screen.queryByRole('status')).toBeNull();
   });
 
+  it.each([
+    ['a card', true],
+    ['a frameless cell', false],
+  ])('shows the host text of the failure kind in %s, and the plain text for a kind without one', (_name, frame) => {
+    const texts = { ...DEFAULT_FRAME_TEXTS, cannotBeShownFor: { request: 'This widget could not be loaded.', data: '  ' } };
+    const { rerender } = render(<CellFrame title="Orders" frame={frame} state="cannot-be-shown" failure="request" texts={texts} />);
+    expect(screen.getByText('This widget could not be loaded.')).toBeTruthy();
+    expect(screen.queryByText('This widget cannot be shown')).toBeNull();
+    for (const failure of ['data', 'transform', undefined] as const) {
+      rerender(<CellFrame title="Orders" frame={frame} state="cannot-be-shown" failure={failure} texts={texts} />);
+      expect(screen.getByText('This widget cannot be shown'), `should show the plain text for ${String(failure)}`).toBeTruthy();
+    }
+  });
+
+  it('keeps the retry button under the host text of a failed request', () => {
+    const texts = { ...DEFAULT_FRAME_TEXTS, cannotBeShownFor: { request: 'This widget could not be loaded.' } };
+    render(<CellFrame title="Orders" state="cannot-be-shown" failure="request" texts={texts} onRetry={() => undefined} />);
+    expect(screen.getByText('This widget could not be loaded.').nextElementSibling?.textContent).toBe('Try again');
+  });
+
   it('shows the widget with the title and no larger-view button when the cell has no larger view', () => {
     render(
       <CellFrame title="Orders" state="shown">
