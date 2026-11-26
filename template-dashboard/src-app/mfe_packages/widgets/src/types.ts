@@ -53,6 +53,8 @@ export interface CartesianRender {
   value_labels?: 'auto' | 'always' | 'never';
   /** What a value label of a stacked bar shows: `segments` (the default) each segment's value, `total` one sum per stack at its end. */
   stack_labels?: 'segments' | 'total';
+  /** The largest thickness of a bar in pixels: its width on a vertical chart, its height on a horizontal one. */
+  max_bar_width?: number;
   /** Marks open the data view with the picked row expanded, and a button opens the whole data view. */
   drill_down?: boolean;
   /** `horizontal` puts the categories on the vertical axis and the values on the horizontal one; a category x axis only. */

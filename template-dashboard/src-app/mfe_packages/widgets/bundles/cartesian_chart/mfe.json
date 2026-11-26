@@ -293,6 +293,11 @@
               "default": "segments",
               "description": "What a value label of a stacked bar shows: segments, each segment's value at its end; total, one label per stack, the sum of the delivered values of its bars at that x, at the end of the stack. A bar outside any stack writes its own value either way, and value_labels decides whether labels show. Without it, segments."
             },
+            "max_bar_width": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional largest thickness of a bar in pixels: its width on a vertical chart, its height on a horizontal one. A bar stays centred in its band, and the band keeps its width. value_labels auto judges the drawn width. Without it, a bar takes its share of 80% of its band."
+            },
             "drill_down": {
               "type": "boolean",
               "default": false,

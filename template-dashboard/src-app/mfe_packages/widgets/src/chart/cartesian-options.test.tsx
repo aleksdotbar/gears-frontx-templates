@@ -795,3 +795,44 @@ describe('cartesian_chart stack totals', () => {
     expect(labelsOf(container)).toEqual([]);
   });
 });
+
+describe('cartesian_chart max_bar_width', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const AUTHORS: CartesianData = { series: [{ name: 'Merged', points: [{ x: 'Avery', y: 176 }, { x: 'Devon', y: 104 }, { x: 'Gray', y: 76 }, { x: 'Jordan', y: 58 }] }] };
+  const BAR = [{ name: 'Merged', type: 'bar' as const }];
+  const widths = (container: HTMLElement, side: 'width' | 'height') => bars(container).flat().map((box) => box[side]);
+
+  it.each<[string, CartesianRender, 'width' | 'height']>([
+    ['vertical', {}, 'width'],
+    ['horizontal', { orientation: 'horizontal' }, 'height'],
+  ])('keeps each bar of a %s chart at most max_bar_width thick, centred in its band', (_case, chart, side) => {
+    const { container } = render(<CartesianChart payload={{ render: { ...chart, series: BAR, max_bar_width: 24 }, data: AUTHORS }} />);
+    const sizes = widths(container, side);
+    expect(sizes).toHaveLength(4);
+    for (const size of sizes) expect(size).toBeLessThanOrEqual(24);
+    for (const size of sizes) expect(size).toBeGreaterThan(20);
+    const boxes = bars(container).flat();
+    const centres = boxes.map((box) => (side === 'width' ? box.x + box.width / 2 : box.y + box.height / 2));
+    const band = (centres[3] - centres[0]) / 3;
+    centres.forEach((centre, index) => expect(Math.abs(centre - (centres[0] + index * band)), `bar ${index} centred`).toBeLessThan(1));
+  });
+
+  it('keeps the bars of a group side by side at the largest width, and draws wider bars without max_bar_width, as before', () => {
+    const two: CartesianData = { series: [AUTHORS.series[0], { name: 'Reviewed', points: AUTHORS.series[0].points.map((point) => ({ ...point, y: (point.y ?? 0) / 2 })) }] };
+    const { container, unmount } = render(<CartesianChart payload={{ render: { series: [...BAR, { name: 'Reviewed', type: 'bar' }], max_bar_width: 16 }, data: two }} />);
+    expect(widths(container, 'width')).toHaveLength(8);
+    for (const size of widths(container, 'width')) expect(size).toBeLessThanOrEqual(16);
+    unmount();
+    const { container: free } = render(<CartesianChart payload={{ render: { series: BAR }, data: AUTHORS }} />);
+    for (const size of widths(free, 'width')) expect(size).toBeGreaterThan(80);
+  });
+
+  it('judges value_labels auto by the drawn width: no value on bars capped below the room a value needs', () => {
+    const { container, unmount } = render(<CartesianChart payload={{ render: { series: BAR, value_labels: 'auto', max_bar_width: 20 }, data: AUTHORS }} />);
+    expect(container.querySelectorAll('text.valueLabel')).toHaveLength(0);
+    unmount();
+    const { container: wide } = render(<CartesianChart payload={{ render: { series: BAR, value_labels: 'auto', max_bar_width: 40 }, data: AUTHORS }} />);
+    expect([...wide.querySelectorAll('text.valueLabel')].map((text) => text.textContent)).toEqual(['176', '104', '76', '58']);
+  });
+});
