@@ -137,8 +137,13 @@ export interface MetricCardRender {
   value_label?: string;
   /** The direction of an improvement, for the trend's colour: `higher` when absent; `neutral` paints no change as better or worse. */
   better?: 'higher' | 'lower' | 'neutral';
-  /** What `reference_value` is, such as last week. */
+  /** What `reference_value` is, such as last week; under `reference_display: change`, the words after the change, such as since last week. */
   reference_label?: string;
+  /**
+   * How the comparison with `reference_value` reads: `values` (the default) as the reference's name and value with the
+   * difference; `change` as the direction and the change in whole units (points for a percent value), then the name.
+   */
+  reference_display?: 'values' | 'change';
   /** A link at the card's foot. */
   link?: WidgetLink;
 }
