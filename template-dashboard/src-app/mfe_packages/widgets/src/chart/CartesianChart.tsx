@@ -730,6 +730,8 @@ export function CartesianChart({
   const longestTick = rows.reduce((max, row) => Math.max(max, axisTick(row.x ?? null).length), 0);
   const needed = horizontal ? TICK_TEXT_HEIGHT : angle === 0 ? longestTick * TICK_CHAR_WIDTH + TICK_GAP.every : TICK_TEXT_HEIGHT / sine;
   const tickStep = slot > 0 ? Math.max(1, Math.ceil(needed / slot)) : 1;
+  // WORKAROUND: Recharts' default interval, preserveEnd, can skip the first category; `auto` keeps the first and the last labelled.
+  const categoryInterval = every ? tickStep - 1 : 'preserveStartEnd';
   // The row of a series' last drawn point, where its name goes; not the last row, which may hold only other series.
   const lastDrawn = (index: number) => rows.reduce((last, row, at) => (typeof row[`v${index}`] === 'number' ? at : last), -1);
   const hasEndLabel = data.series.some((series) => optionOf(series.name)?.label);
@@ -864,7 +866,7 @@ export function CartesianChart({
                   tickLine={false}
                   axisLine={false}
                   minTickGap={every ? 0 : 4}
-                  interval={every ? tickStep - 1 : undefined}
+                  interval={categoryInterval}
                 />
               ) : (
                 <XAxis
@@ -876,7 +878,7 @@ export function CartesianChart({
                   tickLine={false}
                   axisLine={false}
                   minTickGap={every ? 0 : TICK_GAP.auto}
-                  interval={every ? tickStep - 1 : undefined}
+                  interval={axis === 'category' ? categoryInterval : undefined}
                   {...xTick}
                   height={xAxisHeight(longest)}
                 />
