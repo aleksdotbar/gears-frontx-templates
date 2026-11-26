@@ -37,10 +37,11 @@ export interface WidgetTexts {
    */
   radial: { name: string; of: string; goal: string; overTarget: string; goalOutside: string };
   /**
-   * A metric_card: the name of its reference when the render gives none, the accessible name of its difference, and
-   * the accessible name of the dash a null value shows under `null_value: dash`.
+   * A metric_card: the name of its reference when the render gives none, the accessible name of its difference, the
+   * accessible name of the dash a null value shows under `null_value: dash`, and a change of a percent value in points
+   * under `reference_display: change`, such as "-3 pp".
    */
-  metric: { reference: string; difference: (reference: string) => string; noValue: string };
+  metric: { reference: string; difference: (reference: string) => string; noValue: string; points: (points: string) => string };
   /** The pie_chart total, in the text alternative when the render gives no centre caption. */
   pie: { total: string };
   /**
@@ -98,7 +99,7 @@ export const DEFAULT_WIDGET_TEXTS: WidgetTexts = {
   ranked: { value: 'Value', secondary: 'Secondary' },
   progress: { of: 'of', goal: 'Goal', goalOutside: 'outside the bar' },
   radial: { name: 'Progress', of: 'of', goal: 'Goal', overTarget: 'over the target', goalOutside: 'outside the ring' },
-  metric: { reference: 'Reference', difference: (reference) => `Difference from ${reference}`, noValue: 'No value' },
+  metric: { reference: 'Reference', difference: (reference) => `Difference from ${reference}`, noValue: 'No value', points: (points) => `${points} pp` },
   pie: { total: 'Total' },
   funnel: { conversion: 'Conversion', ofPrevious: 'of the previous stage' },
   radar: { axis: 'Axis' },

@@ -2,9 +2,9 @@ import type { CSSProperties } from 'react';
 import { Area, AreaChart } from 'recharts';
 import { Badge, ChartContainer, Text, VisuallyHidden, type ChartConfig } from '@gears-frontx/ui-kit';
 import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from 'lucide-react';
-import type { RenderWidgetPayload, ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
+import { intlLocaleOf, type RenderWidgetPayload, type ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
 
-import { formatValue, nonFiniteProblemOf, relativeChangeOf } from '../format';
+import { formatShare, formatValue, nonFiniteProblemOf, percentOfShare, relativeChangeOf } from '../format';
 import { isLaidOut, useElementSize } from '../chart/size';
 import { SafeLink } from '../links';
 import { DEFAULT_WIDGET_TEXTS, WidgetCannotBeShown, WidgetEmpty, type WidgetTexts } from '../states';
@@ -44,13 +44,12 @@ const variantOf = (direction: Trend['direction'], better: MetricCardRender['bett
 };
 
 /** The direction icon with its accessible name (English, gears-frontx-templates#105), beside the change it stands for. */
-function TrendBadge({ trend, better, texts, locale }: { trend: Trend; better: MetricCardRender['better']; texts: WidgetTexts; locale: string }) {
-  const Icon = ICON[trend.direction];
-  const variant = variantOf(trend.direction, better);
+function TrendBadge({ direction, change, better, texts }: { direction: Trend['direction']; change: string | null; better: MetricCardRender['better']; texts: WidgetTexts }) {
+  const Icon = ICON[direction];
   return (
-    <Badge variant={variant}>
-      <Icon role="img" aria-label={texts.trend[trend.direction]} />
-      {trend.change === null ? null : formatValue(trend.change, { value_type: 'percent' }, locale)}
+    <Badge variant={variantOf(direction, better)}>
+      <Icon role="img" aria-label={texts.trend[direction]} />
+      {change}
     </Badge>
   );
 }
@@ -110,6 +109,30 @@ function Reference({ value, reference, render, valueFormat, texts, locale }: {
   );
 }
 
+function ReferenceChange({ value, reference, render, valueFormat, texts, locale }: {
+  value: number;
+  reference: number;
+  render: MetricCardRender;
+  valueFormat: ValueFormat | undefined;
+  texts: WidgetTexts;
+  locale: string;
+}) {
+  const points = valueFormat?.value_type === 'percent';
+  const change = points ? percentOfShare(value - reference) : reference === 0 ? Number.NaN : relativeChangeOf(value, reference);
+  const whole = new Intl.NumberFormat(intlLocaleOf(locale), { style: points ? 'decimal' : 'percent', maximumFractionDigits: 0, signDisplay: 'exceptZero' });
+  const shown = Number.isFinite(change) ? (points ? whole.format(change) : formatShare(whole, change)) : null;
+  const direction: Trend['direction'] = value === reference || shown === whole.format(0) ? 'flat' : value > reference ? 'up' : 'down';
+  const text = shown !== null && points ? texts.metric.points(shown) : shown;
+  return (
+    <>
+      <TrendBadge direction={direction} change={text} better={render.better} texts={texts} />
+      <Text typography="meta" tone="muted" render={<span />}>
+        {render.reference_label ?? texts.metric.reference}
+      </Text>
+    </>
+  );
+}
+
 /**
  * The `metric_card` widget: one headline value, an optional trend against `previous_value`, and an optional sparkline.
  * The cell's `label` and `container` are accepted like every widget takes them, but a card draws no overlay and its
@@ -165,13 +188,17 @@ export function MetricCard({
         {/* The trend, the caption and the reference share one line that wraps, so a low card keeps room for its foot. */}
         {trend || render.value_label || reference !== null ? (
           <div className={styles.metricMeta}>
-            {trend ? <TrendBadge trend={trend} better={render.better} texts={texts} locale={locale} /> : null}
+            {trend ? <TrendBadge direction={trend.direction} change={trend.change === null ? null : formatValue(trend.change, { value_type: 'percent' }, locale)} better={render.better} texts={texts} /> : null}
             {render.value_label ? (
               <Text typography="meta" tone="muted" render={<span />}>
                 {render.value_label}
               </Text>
             ) : null}
-            {value !== null && reference !== null ? <Reference value={value} reference={reference} render={render} valueFormat={value_format} texts={texts} locale={locale} /> : null}
+            {value === null || reference === null ? null : render.reference_display === 'change' ? (
+              <ReferenceChange value={value} reference={reference} render={render} valueFormat={value_format} texts={texts} locale={locale} />
+            ) : (
+              <Reference value={value} reference={reference} render={render} valueFormat={value_format} texts={texts} locale={locale} />
+            )}
           </div>
         ) : null}
       </div>

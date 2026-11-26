@@ -59,7 +59,7 @@
                 "number",
                 "null"
               ],
-              "description": "Optional value the headline is compared with, such as last week's, shown under it with the difference: absolute, and in percent when the reference is not 0. The difference is coloured by the render's better rule, as the trend is. Absent or null shows no comparison."
+              "description": "Optional value the headline is compared with, such as last week's, shown under it with the difference: absolute, and in percent when the reference is not 0, or as a change under the render's reference_display change. The difference is coloured by the render's better rule, as the trend is. Absent or null shows no comparison."
             }
           }
         }
@@ -93,7 +93,12 @@
             },
             "reference_label": {
               "type": "string",
-              "description": "Optional name of reference_value, such as Last week, written before it. Without it, Reference."
+              "description": "Optional name of reference_value, such as Last week, written before it. Under reference_display change, the words after the change, such as since last week. Without it, Reference."
+            },
+            "reference_display": {
+              "enum": ["values", "change"],
+              "default": "values",
+              "description": "Optional way the comparison with reference_value reads. values (the default): the reference's name and its value, and a badge with the difference, absolute and in percent. change: a badge with the direction icon and the change in whole units, then reference_label. A percent value changes by points (-3 pp), any other value by its relative percent (+25%); against a 0 reference that is no percent, the badge shows the icon alone. The reference's own value is not shown."
             },
             "link": {
               "type": "object",

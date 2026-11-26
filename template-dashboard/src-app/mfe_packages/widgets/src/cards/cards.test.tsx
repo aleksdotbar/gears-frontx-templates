@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
@@ -422,6 +422,61 @@ describe('metric_card reference and link', () => {
     const { container } = metric({ reference_value: 120 }, {}, texts);
     expect(screen.getByText('Vergleich 120')).toBeTruthy();
     expect(badgesIn(container)[0].textContent).toBe('Abstand zu Vergleich: -10 (-8.33%)');
+  });
+
+  describe('with reference_display change', () => {
+    const change = (value: number, reference: number | null, renderOptions: MetricCardRender = {}, format?: ValueFormat, texts?: WidgetTexts) =>
+      render(<MetricCard payload={{ render: { reference_display: 'change', reference_label: 'since the previous period', ...renderOptions }, data: { value, reference_value: reference }, value_format: format }} texts={texts} />);
+    const PERCENT: ValueFormat = { value_type: 'percent' };
+
+    // A percent value changes by whole points, any other value by its whole relative percent; a sign only when it does not show as zero.
+    it.each<{ case: string; value: number; reference: number; render?: MetricCardRender; format?: ValueFormat; text: string; icon: string; paint: string }>([
+      { case: '263 against 210', value: 263, reference: 210, text: '+25%', icon: 'Up', paint: 'success' },
+      { case: '270 against 324', value: 270, reference: 324, text: '-17%', icon: 'Down', paint: 'danger' },
+      { case: '1004 against 1000', value: 1004, reference: 1000, text: '0%', icon: 'No change', paint: 'neutral' },
+      { case: '99.6 against 100', value: 99.6, reference: 100, text: '0%', icon: 'No change', paint: 'neutral' },
+      { case: '29 against 100', value: 29, reference: 100, text: '-71%', icon: 'Down', paint: 'danger' },
+      { case: 'a rise, better lower', value: 40, reference: 32, render: { better: 'lower' }, text: '+25%', icon: 'Up', paint: 'danger' },
+      { case: 'a rise, better neutral', value: 40, reference: 32, render: { better: 'neutral' }, text: '+25%', icon: 'Up', paint: 'neutral' },
+      { case: 'a percent of 12.8% against 16%', value: 0.128, reference: 0.16, format: PERCENT, text: '-3 pp', icon: 'Down', paint: 'danger' },
+      { case: 'a percent of 0.29 against 0.24', value: 0.29, reference: 0.24, format: PERCENT, text: '+5 pp', icon: 'Up', paint: 'success' },
+      { case: 'a percent of 50.4% against 50%', value: 0.504, reference: 0.5, format: PERCENT, text: '0 pp', icon: 'No change', paint: 'neutral' },
+      { case: 'a percent against 0%', value: 0.25, reference: 0, format: PERCENT, text: '+25 pp', icon: 'Up', paint: 'success' },
+      { case: 'a percent with decimals 2', value: 0.1234, reference: 0.1, format: { value_type: 'percent', decimals: 2 }, text: '+2 pp', icon: 'Up', paint: 'success' },
+      { case: 'a duration', value: 40, reference: 32, format: { value_type: 'duration', unit: 'h' }, text: '+25%', icon: 'Up', paint: 'success' },
+    ])('shows $case as $text with the $icon icon, painted $paint, before the reference name', ({ value, reference, render: renderOptions, format, text, icon, paint }) => {
+      const { container } = change(value, reference, renderOptions, format);
+      const [badge] = badgesIn(container);
+      expect(badge.textContent).toBe(text);
+      expect(within(badge as HTMLElement).getByRole('img', { name: icon })).toBeTruthy();
+      expect(PAINTS.find(([variant]) => badge.className.includes(variant))?.[1] ?? badge.className).toBe(paint);
+      expect(badge.nextElementSibling?.textContent).toBe('since the previous period');
+      expect(container.textContent).not.toContain(String(reference));
+    });
+
+    it('shows the direction icon alone against a 0 reference that is no percent, and nothing for a null one', () => {
+      const { container, unmount } = change(5, 0);
+      const [badge] = badgesIn(container);
+      expect(badge.textContent).toBe('');
+      expect(within(badge as HTMLElement).getByRole('img', { name: 'Up' })).toBeTruthy();
+      expect(badge.nextElementSibling?.textContent).toBe('since the previous period');
+      unmount();
+      const { container: none } = change(5, null);
+      expect(badgesIn(none)).toEqual([]);
+      expect(screen.queryByText('since the previous period')).toBeNull();
+    });
+
+    it('takes the points wording from the texts', () => {
+      const texts: WidgetTexts = { ...DEFAULT_WIDGET_TEXTS, metric: { ...DEFAULT_WIDGET_TEXTS.metric, points: (points) => `${points} Pp.` } };
+      const { container } = change(0.128, 0.16, {}, PERCENT, texts);
+      expect(badgesIn(container)[0].textContent).toBe('-3 Pp.');
+    });
+
+    it('keeps the values form with reference_display values', () => {
+      const { container } = change(263, 210, { reference_display: 'values', reference_label: 'Last week' });
+      expect(screen.getByText('Last week 210')).toBeTruthy();
+      expect(badgesIn(container)[0].textContent).toBe('Difference from Last week: +53 (+25.24%)');
+    });
   });
 
   it('draws the link at the card foot, and a refused target as text', () => {

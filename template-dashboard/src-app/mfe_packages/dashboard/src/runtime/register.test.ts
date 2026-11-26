@@ -353,6 +353,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/column_widths/);
   });
 
+  it('accepts a metric_card reference_display of values or change, and fails any other value', () => {
+    const type = shipped.find((id) => id.endsWith('.metric_card.v1~'))!;
+    const card = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = ['values', 'change', 'delta', true];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, card, 'reference_display', `c${index}`, value))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(2, 'cell'), slotOf(3, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/reference_display/);
+  });
+
   it('accepts ranked status tones from the shared tones type, and fails a tone outside its closed values or an empty status', () => {
     const type = shipped.find((id) => id.endsWith('.ranked_list_card.v1~'))!;
     const ranked = demoWidgets.find((widget) => widget.id.startsWith(type))!;
