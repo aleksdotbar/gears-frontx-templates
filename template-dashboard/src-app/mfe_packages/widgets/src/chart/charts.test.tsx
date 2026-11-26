@@ -1467,7 +1467,7 @@ describe('treemap_chart', () => {
       { label: 'd', value: 1, group: 'Data' },
     ]);
     // The groups keep their first-seen order, each header writing its name and total.
-    expect(heads(container).map((head) => head.textContent)).toEqual(['Web, 6', 'Other, 3', 'Data, 1']);
+    expect(heads(container).map((head) => head.textContent)).toEqual(['Web · 6', 'Other · 3', 'Data · 1']);
     expect(heads(container).map((head) => head.getAttribute('title'))).toEqual(['Web: 6', 'Other: 3', 'Data: 1']);
     expect(faces(container)).toHaveLength(3);
     expect(faces(container).map((face) => face.style.getPropertyValue('--tile'))).toEqual(['var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)']);
@@ -1590,10 +1590,16 @@ describe('treemap_chart', () => {
       { label: 'd', value: 1, group: 'Data' },
     ];
     const { container } = draw(items, { show_share: true });
-    expect(heads(container).map((head) => head.textContent)).toEqual(['Web, 6 60%', 'Data, 4 40%']);
+    expect(heads(container).map((head) => head.textContent)).toEqual(['Web · 6 60%', 'Data · 4 40%']);
     expect(heads(container).map((head) => head.querySelector('[class*="treemapShare"]')?.textContent)).toEqual(['60%', '40%']);
+    // The header is a flex box, which drops the spaces at the edges of its text runs: the text stands in one inline
+    // run, so the spaces around the separator stay.
+    expect(heads(container).map((head) => [head.childNodes.length, head.firstElementChild?.textContent])).toEqual([
+      [1, 'Web · 6 60%'],
+      [1, 'Data · 4 40%'],
+    ]);
     cleanup();
-    expect(heads(draw(items).container).map((head) => head.textContent)).toEqual(['Web, 6', 'Data, 4']);
+    expect(heads(draw(items).container).map((head) => head.textContent)).toEqual(['Web · 6', 'Data · 4']);
     cleanup();
     // A box whose group faces fit the names but not the totals: the names alone.
     sized(50, 300);
@@ -1610,7 +1616,7 @@ describe('treemap_chart', () => {
       ],
       { show_share: true },
     );
-    expect(heads(container).map((head) => head.textContent)).toEqual(['Web, 100%']);
+    expect(heads(container).map((head) => head.textContent)).toEqual(['Web · 100%']);
     expect(heads(container).map((head) => head.getAttribute('title'))).toEqual(['Web, 100% of the total']);
   });
 
@@ -1651,7 +1657,7 @@ describe('treemap_chart', () => {
       />,
     );
     expect(within(alternative('Diagramm')).getAllByRole('columnheader', { hidden: true }).map((cell) => cell.textContent)).toEqual(['Label', 'Gruppe', 'Value', 'Anteil']);
-    expect(heads(container).map((head) => head.textContent)).toEqual(['Rest, 3 75%', 'Web, 1 25%']);
+    expect(heads(container).map((head) => head.textContent)).toEqual(['Rest · 3 75%', 'Web · 1 25%']);
     expect(tiles(container).at(0)?.getAttribute('title')).toBe('a: 3, Rest, 75% von der Gesamtzeit');
   });
 
