@@ -322,7 +322,7 @@ export function GridWidget({
   useAriaSort(root, sortedHeading, order?.[0]?.direction, occurrence);
 
   if (problem) return <WidgetCannotBeShown texts={texts} problem={problem} />;
-  if (rows.length === 0) return <WidgetEmpty texts={texts} />;
+  if (rows.length === 0) return <WidgetEmpty texts={texts} text={payload.empty_text} />;
   const excluded = render.columns.flatMap((column, index) => (isSortable(column) ? [] : [columnId(index)]));
   return (
     <div ref={setRoot} className={styles.grid} style={{ '--data-grid-table-min-inline-size': `${tableFloorOf(render.columns)}px` } as CSSProperties}>

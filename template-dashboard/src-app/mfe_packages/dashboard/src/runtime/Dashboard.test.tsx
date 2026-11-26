@@ -590,6 +590,32 @@ describe('Dashboard on the real registry', () => {
     expect(lines[0]).toContain('the integer 9007199254740993 is outside the range a JSON number holds exactly');
     errors.mockRestore();
   }, 15_000);
+
+  it('shows the empty_text of a cell in its widget\'s empty state, and a dash with its caption for a null metric under null_value dash', async () => {
+    const demo = DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } };
+    const metric = demo.layout.cells.find((cell) => cell.widget.id.includes('.metric_card.'))!;
+    const pie = demo.layout.cells.find((cell) => cell.widget.id.includes('.pie_chart.'))!;
+    const cellOf = (base: typeof metric, suffix: string, widget: Record<string, unknown>) => ({
+      size: 'small',
+      widget: { id: base.widget.id.replace(/[0-9a-f]{4}$/, suffix), title: suffix, ...widget },
+    });
+    const cells = [
+      cellOf(pie, 'b001', { render: {}, empty_text: 'Nothing in this window. Try a wider range.', data: { params: {}, transform: "{'slices': []}" } }),
+      cellOf(pie, 'b002', { render: {}, data: { params: {}, transform: "{'slices': []}" } }),
+      cellOf(metric, 'b003', { render: { value_label: 'Deploys', null_value: 'dash' }, empty_text: 'No data.', data: { params: {}, transform: "{'value': null}" } }),
+      cellOf(metric, 'b004', { render: { value_label: 'Deploys', null_value: 'dash' }, empty_text: 'No data.', data: { params: {}, transform: '{}' } }),
+    ];
+    const file: ServedFile = { ...DEMO_SERVED_FILE, instances: [...DEMO_SERVED_FILE.instances.filter((instance) => instance.id !== DEMO_DASHBOARD_ID), { ...demo, layout: { cells } }] };
+    const root = new DashboardRoot({ host: createMockHost({ delayMs: 0, file }), entries: WIDGET_ENTRIES, origin: 'http://localhost' });
+    const { container } = render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+    // The widget's own text, without the styles its shadow root carries.
+    const widgetTexts = () =>
+      [...container.querySelectorAll<HTMLElement>('[data-widget-extension]')].map((host) =>
+        [...(host.shadowRoot?.children ?? [])].filter((child) => child.tagName !== 'STYLE').map((child) => child.textContent).join(''),
+      );
+    await waitFor(() => expect(widgetTexts()).toEqual(['Nothing in this window. Try a wider range.', 'No data to show', '—No valueDeploys', 'No data.']), { timeout: 5000 });
+    expect(screen.queryByText('This widget cannot be shown')).toBeNull();
+  }, 15_000);
 });
 
 // The root stamps each widget's render with its widget type's render type and registers it, like the data.

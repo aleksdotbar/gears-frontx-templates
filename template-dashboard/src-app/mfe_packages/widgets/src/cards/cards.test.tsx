@@ -124,6 +124,42 @@ describe('metric_card', () => {
     expect(screen.getByText('No data to show')).toBeTruthy();
   });
 
+  it('shows a dash with the caption, the sparkline and the link for a null value under null_value dash, and no trend or comparison', () => {
+    const { container } = render(
+      <MetricCard
+        payload={{
+          render: { value_label: 'Deploys', null_value: 'dash', link: { text: 'All deploys', href: '/deploys' } },
+          data: { value: null, previous_value: 10, reference_value: 12, sparkline: [1, 2, 3] },
+        }}
+      />,
+    );
+    const headline = container.querySelector('strong');
+    expect(headline?.textContent).toBe('—No value');
+    expect(headline?.querySelector('[aria-hidden="true"]')?.textContent).toBe('—');
+    expect(screen.getByText('Deploys')).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'All deploys' })).toBeTruthy();
+    expect(screen.queryByRole('img')).toBeNull();
+    expect(screen.queryByText(/Reference/)).toBeNull();
+    expect(badgesIn(container)).toEqual([]);
+    expect(screen.queryByText('No data to show')).toBeNull();
+  });
+
+  it('keeps the unit word off the dash of a null value', () => {
+    const { container } = render(<MetricCard payload={{ render: { null_value: 'dash' }, value_format: { value_type: 'number', unit_label: 'commits' }, data: { value: null } }} />);
+    expect(container.querySelector('strong')?.textContent).toBe('—No value');
+  });
+
+  it.each<MetricCardRender['null_value']>([undefined, 'empty', 'dash'])('shows the empty state for an absent value under null_value %s', (nullValue) => {
+    render(<MetricCard payload={{ render: nullValue ? { value_label: 'Deploys', null_value: nullValue } : { value_label: 'Deploys' }, data: { previous_value: 10 } }} />);
+    expect(screen.getByText('No data to show')).toBeTruthy();
+    expect(screen.queryByText('Deploys')).toBeNull();
+  });
+
+  it('shows a number value under null_value dash as it shows one without it', () => {
+    const { container } = render(<MetricCard payload={{ render: { null_value: 'dash' }, data: { value: 0 } }} />);
+    expect(container.querySelector('strong')?.textContent).toBe('0');
+  });
+
   it('shows its cannot-be-shown state without data', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
     render(<MetricCard payload={{ render: {} }} />);
@@ -375,7 +411,7 @@ describe('metric_card reference and link', () => {
   });
 
   it('takes the reference name and the difference wording from the texts', () => {
-    const texts: WidgetTexts = { ...DEFAULT_WIDGET_TEXTS, metric: { reference: 'Vergleich', difference: (name) => `Abstand zu ${name}` } };
+    const texts: WidgetTexts = { ...DEFAULT_WIDGET_TEXTS, metric: { ...DEFAULT_WIDGET_TEXTS.metric, reference: 'Vergleich', difference: (name) => `Abstand zu ${name}` } };
     const { container } = metric({ reference_value: 120 }, {}, texts);
     expect(screen.getByText('Vergleich 120')).toBeTruthy();
     expect(badgesIn(container)[0].textContent).toBe('Abstand zu Vergleich: -10 (-8.33%)');
