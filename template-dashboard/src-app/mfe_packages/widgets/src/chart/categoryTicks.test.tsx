@@ -119,6 +119,17 @@ describe('cartesian_chart tick_angle auto', () => {
     expect(new Set(anglesOf(container))).toEqual(new Set([angle]));
   });
 
+  // A band of 51 names is 11.5 px wide: a label needs two bands at 45° and at 90°. A band of 60 names needs three at 45° and two at 90°.
+  it.each<[number, string]>([
+    [51, '-45'],
+    [60, '-90'],
+  ])('labels every other one of %i bars that no turn fits, at %s', (count, angle) => {
+    const names = Array.from({ length: count }, (_, index) => `name-${String(index + 1).padStart(2, '0')}`);
+    const { container } = render(<CartesianChart payload={{ render: { x_axis: every, series: [{ name: 'Runs', type: 'bar' }] }, data: dataOf(names) }} />);
+    expect(new Set(anglesOf(container))).toEqual(new Set([angle]));
+    expect(ticksOf(container, 'x')).toEqual(names.filter((_, index) => index % 2 === 0));
+  });
+
   it('writes the categories of a horizontal chart level', () => {
     const { container } = render(<CartesianChart payload={{ render: { orientation: 'horizontal', x_axis: every, series: [{ name: 'Runs', type: 'bar' }] }, data: dataOf(LONG) }} />);
     expect(container.querySelector('.recharts-yAxis-tick-labels [transform*="rotate(-"]')).toBeNull();
