@@ -11,6 +11,7 @@ import { composeServedFile } from './served';
 /** The demo file with the catalog bundles' parts, as a product serves it. */
 const DEMO_SERVED_FILE = composeServedFile(DEMO_WITHOUT_BUNDLES, IN_BUNDLE_PARTS);
 import { SharedRequests } from './binding';
+import { DEFAULT_FRAME_TEXTS, type FrameTexts } from '../frame/CellFrame';
 import { Dashboard, type CellActionTarget, type DashboardProps } from './Dashboard';
 import { DashboardRoot, RENDER_RESERVED_FIELDS, type CellFailureReport } from './DashboardRoot';
 import { fetchHost, type DashboardHost } from './host';
@@ -1860,5 +1861,73 @@ describe('the onFailure hook', () => {
     expect(thrown).toHaveLength(2);
     expect(thrown[0]).toContain('tracker offline');
     expect(thrown[0]).not.toContain('faked');
+  }, 15_000);
+});
+
+describe('the cannot-be-shown text of a failure kind', () => {
+  const demo = DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } };
+  const grid = demo.layout.cells.find((cell) => cell.widget.id.includes('.grid.v1~'))!;
+  const metric = demo.layout.cells.find((cell) => cell.widget.id.includes('.metric_card.'))!;
+  const metricWith = (data: Record<string, unknown>, suffix = 'd001') => ({ ...metric, widget: { ...metric.widget, id: metric.widget.id.replace(/[0-9a-f]{4}$/, suffix), render: {}, data } });
+  const fileWith = (...cells: unknown[]): ServedFile => ({
+    ...DEMO_SERVED_FILE,
+    instances: [...DEMO_SERVED_FILE.instances.filter((instance) => instance.id !== DEMO_DASHBOARD_ID), { ...demo, layout: { cells } }],
+  });
+  const refusing = (): MfeEntryLifecycle => ({
+    mount(container, bridge) {
+      bridge.registerActionHandler(RENDER_WIDGET_ACTION_ID, ActionHandler.fromFunction(async () => Promise.reject(new Error('refused'))));
+      container.appendChild(document.createElement('output'));
+    },
+    unmount() {},
+  });
+  const { [`${ENTRY}grid.v1`]: _grid, ...withoutGrid } = entries;
+  const KINDS = ['registration', 'mount', 'request', 'transform', 'data', 'render_widget'] as const;
+  const TEXTS = { ...DEFAULT_FRAME_TEXTS, cannotBeShownFor: Object.fromEntries(KINDS.map((kind) => [kind, `No ${kind} for this widget.`])) };
+  const showWith = (file: ServedFile, cellEntries: typeof entries, frame: FrameTexts = TEXTS) => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.spyOn(MfeHandlerMF.prototype, 'load').mockRejectedValue(new Error('no bundle server in jsdom'));
+    const root = new DashboardRoot({ host: createMockHost({ delayMs: 0, file }), entries: cellEntries, origin: globalThis.location.origin });
+    return render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} texts={{ frame }} />);
+  };
+
+  it.each([
+    ['registration', metricWith({ request: null, transform: 'response' }), entries],
+    ['mount', grid, withoutGrid],
+    ['request', metricWith({ request: { method: 'GET', path: '/api/demo/broken' }, transform: "{'value': 1}" }), entries],
+    ['transform', metricWith({ params: {}, transform: "{'value': 1 / 0}" }), entries],
+    ['data', metricWith({ params: {}, transform: "{'value': 'seven'}" }), entries],
+    ['render_widget', metricWith({ params: {}, transform: "{'value': 7}" }), { ...entries, [`${ENTRY}metric_card.v1`]: refusing }],
+  ] as const)('shows the host text of a %s failure in place of the plain one', async (kind, failing, cellEntries) => {
+    showWith(fileWith(failing), cellEntries);
+    expect(await screen.findByText(`No ${kind} for this widget.`, {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByText('This widget cannot be shown')).toBeNull();
+    expect(screen.queryAllByText(/^No [a-z_]+ for this widget\.$/)).toHaveLength(1);
+  }, 15_000);
+
+  it('shows the plain text for a kind the host gives no text for', async () => {
+    showWith(fileWith(metricWith({ params: {}, transform: "{'value': 1 / 0}" })), entries, { ...DEFAULT_FRAME_TEXTS, cannotBeShown: 'Plain text.', cannotBeShownFor: { request: 'Request text.' } });
+    expect(await screen.findByText('Plain text.', {}, { timeout: 5000 })).toBeTruthy();
+    expect(screen.queryByText('Request text.')).toBeNull();
+  }, 15_000);
+
+  it('shows the host text of the failure kind in a larger view', async () => {
+    const larger = metricWith({ params: {}, transform: "{'value': 'seven'}" }, 'd002').widget;
+    showWith(fileWith({ ...metricWith({ params: {}, transform: "{'value': 7}" }), larger_view: larger }), entries);
+    await waitFor(() => expect(screen.getByRole('button', { name: /larger/ })).toBeTruthy(), { timeout: 5000 });
+    fireEvent.click(screen.getByRole('button', { name: /larger/ }));
+    expect(await within(await screen.findByRole('dialog')).findByText('No data for this widget.', {}, { timeout: 5000 })).toBeTruthy();
+  }, 15_000);
+
+  it('drops the text of the failure once the cell shows again after a retry', async () => {
+    let down = true;
+    const host = { ...createMockHost({ delayMs: 0, file: fileWith(metricWith({ request: { method: 'GET', path: '/api/demo/teams/goals' }, transform: "{'value': 1}" })) }), request: () => (down ? Promise.reject(new Error('down')) : Promise.resolve({})) };
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const root = new DashboardRoot({ host, entries, origin: 'http://localhost' });
+    const { container } = render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} texts={{ frame: TEXTS }} />);
+    expect(await screen.findByText('No request for this widget.', {}, { timeout: 5000 })).toBeTruthy();
+    down = false;
+    fireEvent.click(screen.getByRole('button', { name: /Try again/ }));
+    await waitFor(() => expect(shadowTexts(container)).toEqual(['theme light; language en; data id,value']), { timeout: 5000 });
+    expect(screen.queryByText('No request for this widget.')).toBeNull();
   }, 15_000);
 });
