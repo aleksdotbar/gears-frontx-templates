@@ -16,8 +16,9 @@ import styles from '../widgets.module.css';
 /** The bounds the widget checks itself, as the data type cannot count the distinct axes and series of the long format. */
 const MIN_AXES = 3;
 const MAX_AXES = 12;
-// One series per tone of the palette: polygons overlap by design, so no two series may share a colour.
-const MAX_SERIES = PALETTE.length;
+// One series per --chart-N token, the first five steps of the palette: polygons overlap by design, so no two series may
+// share a colour.
+const MAX_SERIES = 5;
 
 // The area of a series, over its stroke of the same tone, when `fill` keeps it.
 const AREA_OPACITY = 0.25;
