@@ -228,6 +228,7 @@ describe('the render_widget action', () => {
     ['decimals on a percent', { value_format: { value_type: 'percent', decimals: 0 } }],
     ['a unit label and decimals on a number', { value_format: { value_type: 'number', unit_label: 'lines', decimals: 6 } }],
     ['decimals on a duration', { value_format: { value_type: 'duration', unit: 's', decimals: 1 } }],
+    ['a title', { title: 'Open pull requests' }],
   ])('accepts a payload with %s', (_name, extra) => {
     expect(() => registry().register(action({ render: { label: 'Deploys' }, ...extra }))).not.toThrow();
   });
@@ -254,6 +255,19 @@ describe('the render_widget action', () => {
       paths = instancePathsOf(error);
     }
     expect(paths).toContain(path);
+  });
+
+  it.each([
+    ['blank', ''],
+    ['not a string', 5],
+  ])('rejects a title that is %s', (_name, title) => {
+    let paths: string[] = [];
+    try {
+      registry().register(action({ render: {}, title }));
+    } catch (error) {
+      paths = instancePathsOf(error);
+    }
+    expect(paths).toContain('/payload/title');
   });
 
   it.each([
