@@ -542,8 +542,20 @@ export function CartesianChart({
   const primaryWidth = valueAxisWidth('primary');
   const secondaryWidth = valueAxisWidth('secondary');
   const xTitle = render.x_axis?.label ? AXIS_TITLE : 0;
+  const rows = rowsOf(data, axis);
+  const secondary = data.series.some((_, index) => onSecondary(index));
+  // `auto` turns the category ticks only as far as each band needs to hold its whole label: level, then 45°, then 90°.
+  const autoAngle = (): 0 | -45 | -90 => {
+    if (axis !== 'category' || rows.length === 0 || width === 0) return 0;
+    const plot = width - primaryWidth - (secondary ? secondaryWidth : 8);
+    const longest = rows.reduce((max, row) => Math.max(max, tickText(row.x ?? null).length), 0);
+    if (longest * TICK_CHAR_WIDTH + TICK_GAP.every <= plot / rows.length) return 0;
+    const overhang = Math.max(0, Math.ceil(tickText(rows[0].x ?? null).length * TICK_CHAR_WIDTH * Math.SQRT1_2) - primaryWidth);
+    return TICK_TEXT_HEIGHT * Math.SQRT2 <= (plot - overhang) / rows.length ? -45 : -90;
+  };
+  const askedAngle = render.x_axis?.tick_angle ?? 0;
   // tick_angle turns the x ticks under the plot; a horizontal chart writes its categories level beside it.
-  const angle = compact || render.orientation === 'horizontal' ? 0 : (render.x_axis?.tick_angle ?? 0);
+  const angle = compact || render.orientation === 'horizontal' ? 0 : askedAngle === 'auto' ? autoAngle() : askedAngle;
   const legend = compact && data.series.length <= 1 ? 'none' : render.legend_position;
   const sine = Math.sin((Math.abs(angle) * Math.PI) / 180);
   // The x axis height for tick labels of up to `longest` characters at the tick angle, with the x title.
@@ -678,7 +690,6 @@ export function CartesianChart({
     );
   }
 
-  const rows = rowsOf(data, axis);
   const horizontal = render.orientation === 'horizontal';
   drawnValues(rows, data, axis, optionOf, (index) => (onSecondary(index) ? render.y_axis_secondary?.type : render.y_axis?.type) === 'log', percent);
   const stackTotals = render.stack_labels === 'total';
@@ -742,7 +753,6 @@ export function CartesianChart({
   };
   const formatColumn = (column: number) => (value: string | number | null) =>
     column === 0 ? xText(value) : column <= data.series.length ? formatSeries(column - 1)(value) : column <= data.series.length + labelledSeries.length ? format(value) : formatSize(value);
-  const secondary = data.series.some((_, index) => onSecondary(index));
   const share = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 1 });
 
   // Value labels: `auto` writes them when each bar is wide enough. Bars of one stack share a slot; Recharts gives the slots 80% of a category.

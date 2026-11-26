@@ -102,3 +102,31 @@ describe('cartesian_chart long category names', () => {
     for (const tick of ticks) expect(tick, `should be whole: ${tick}`).not.toContain('…');
   });
 });
+
+describe('cartesian_chart tick_angle auto', () => {
+  const anglesOf = (container: HTMLElement) => [...container.querySelectorAll('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value')].map((tick) => /rotate\((-?\d+)/.exec(tick.getAttribute('transform') ?? '')?.[1] ?? '0');
+  const every: CartesianRender['x_axis'] = { tick_labels: 'every', tick_angle: 'auto' };
+  // 32 names of 7 characters: a band of the 640 px chart is narrower than a label turned 45° needs, and as wide as one turned 90° needs.
+  const MANY = Array.from({ length: 32 }, (_, index) => `name-${String(index + 1).padStart(2, '0')}`);
+
+  it.each<[string, string[], string]>([
+    ['level, when every whole name fits its band', ['alpha-service-test-suite', 'bravo-service-test-suite', 'charlie-service-test-suite'], '0'],
+    ['at -45, when a name does not fit its band level', LONG, '-45'],
+    ['at -90, when a band is narrower than a label turned 45° needs', MANY, '-90'],
+  ])('labels each bar with its whole name %s', (_case, names, angle) => {
+    const { container } = render(<CartesianChart payload={{ render: { x_axis: every, series: [{ name: 'Runs', type: 'bar' }] }, data: dataOf(names) }} />);
+    expect(ticksOf(container, 'x')).toEqual(names);
+    expect(new Set(anglesOf(container))).toEqual(new Set([angle]));
+  });
+
+  it('writes the categories of a horizontal chart level', () => {
+    const { container } = render(<CartesianChart payload={{ render: { orientation: 'horizontal', x_axis: every, series: [{ name: 'Runs', type: 'bar' }] }, data: dataOf(LONG) }} />);
+    expect(container.querySelector('.recharts-yAxis-tick-labels [transform*="rotate(-"]')).toBeNull();
+  });
+
+  it('keeps the ticks of a value axis level', () => {
+    const data: CartesianData = { series: [{ name: 'Runs', points: Array.from({ length: 60 }, (_, index) => ({ x: 1_000_000_000 + index * 123_456_789, y: index })) }] };
+    const { container } = render(<CartesianChart payload={{ render: { x_axis: { type: 'value', tick_angle: 'auto' }, series: [{ name: 'Runs', type: 'line' }] }, data }} />);
+    expect(new Set(anglesOf(container))).toEqual(new Set(['0']));
+  });
+});

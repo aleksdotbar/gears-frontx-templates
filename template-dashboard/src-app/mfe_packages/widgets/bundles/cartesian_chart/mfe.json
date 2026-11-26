@@ -225,10 +225,11 @@
                   "enum": [
                     0,
                     -45,
-                    -90
+                    -90,
+                    "auto"
                   ],
                   "default": 0,
-                  "description": "Rotation of the tick labels in degrees; a tilted axis grows to fit them, so a tilted label is never cut. Without it, 0."
+                  "description": "Rotation of the tick labels in degrees; a tilted axis grows to fit them, so a tilted label is never cut. auto turns the ticks of a category axis only as far as each category needs to keep its whole label: 0, then -45, then -90; a value or time axis stays level. Without it, 0."
                 }
               }
             },

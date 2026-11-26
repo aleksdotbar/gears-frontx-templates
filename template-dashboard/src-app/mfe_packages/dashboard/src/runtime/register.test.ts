@@ -393,6 +393,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/series_tones/);
   });
 
+  it('accepts a cartesian_chart x_axis.tick_angle of auto, and fails a rotation outside its closed values', () => {
+    const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
+    const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = ['auto', -45, -30, 'AUTO'];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, chart, 'x_axis', `d${index}`, { ...(chart.render.x_axis as object), tick_angle: value }))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(2, 'cell'), slotOf(3, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/x_axis\/tick_angle/);
+  });
+
   it('accepts a cartesian_chart x_axis.value_format of the shared value_format type, and fails one outside its closed values', () => {
     const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
     const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
