@@ -632,6 +632,23 @@ export function CartesianChart({
   const horizontal = render.orientation === 'horizontal';
   const percent = render.stack_mode === 'percent';
   drawnValues(rows, data, axis, optionOf, (index) => (onSecondary(index) ? render.y_axis_secondary?.type : render.y_axis?.type) === 'log', percent);
+  const stackTotals = render.stack_labels === 'total';
+  const stackOf = (index: number) => {
+    const option = optionOf(data.series[index].name);
+    return typeOf(data.series[index].name) === 'bar' && option?.stack_group !== undefined ? `${option.y_axis === 'secondary' ? 'secondary' : 'primary'}:${option.stack_group}` : undefined;
+  };
+  // INVARIANT: `t<i>` holds a stack's delivered total only on the row of its last bar with a value other than 0 there: a 0 bar draws no label.
+  if (stackTotals)
+    for (const row of rows) {
+      const tops = new Map<string, { index: number; total: number }>();
+      data.series.forEach((_, index) => {
+        const stack = stackOf(index);
+        const value = row[`v${index}`];
+        if (stack === undefined || typeof value !== 'number' || value === 0) return;
+        tops.set(stack, { index, total: (tops.get(stack)?.total ?? 0) + value });
+      });
+      for (const { index, total } of tops.values()) row[`t${index}`] = total;
+    }
   // The sizes and the point labels of the scatter series that carry them, on the row of their x, for the bubbles, the tooltip, the data view and the text alternative.
   const sizedSeries = data.series.flatMap((series, index) => (typeOf(series.name) === 'scatter' && series.points.some((point) => typeof point.size === 'number') ? [index] : []));
   const labelledSeries = data.series.flatMap((series, index) => (typeOf(series.name) === 'scatter' && series.points.some((point) => typeof point.label === 'string') ? [index] : []));
@@ -747,6 +764,7 @@ export function CartesianChart({
       const stack = option?.stack_group === undefined ? undefined : `${axis}:${option.stack_group}`;
       const top = stack === undefined ? value : (totals.get(stack) ?? 0) + value;
       if (stack !== undefined) totals.set(stack, top);
+      if (stackTotals && stack !== undefined && typeof row[`t${index}`] !== 'number') return [];
       return [{ axis, value: top, below: value < 0 } as LabelledTop];
     });
   };
@@ -943,7 +961,7 @@ export function CartesianChart({
                         {/* The label shows the delivered value, also where the bar stands at its share of a percent stack. */}
                         {showValues ? (
                           <LabelList
-                            dataKey={`v${index}`}
+                            dataKey={stackTotals && stackOf(index) !== undefined ? `t${index}` : `v${index}`}
                             position={horizontal ? 'right' : 'top'}
                             offset={4}
                             className={styles.valueLabel}

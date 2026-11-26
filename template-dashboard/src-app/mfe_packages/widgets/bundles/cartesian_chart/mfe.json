@@ -285,6 +285,14 @@
               "default": "never",
               "description": "Values written at the end of the bars (above a bar that grows up, below one that grows down; a zero bar has none): always, never, or auto when every bar is wide enough for its value. Without it, never."
             },
+            "stack_labels": {
+              "enum": [
+                "segments",
+                "total"
+              ],
+              "default": "segments",
+              "description": "What a value label of a stacked bar shows: segments, each segment's value at its end; total, one label per stack, the sum of the delivered values of its bars at that x, at the end of the stack. A bar outside any stack writes its own value either way, and value_labels decides whether labels show. Without it, segments."
+            },
             "drill_down": {
               "type": "boolean",
               "default": false,

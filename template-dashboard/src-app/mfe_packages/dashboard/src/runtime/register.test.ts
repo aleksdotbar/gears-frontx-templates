@@ -363,6 +363,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/reference_display/);
   });
 
+  it('accepts a cartesian_chart stack_labels of segments or total, and fails any other value', () => {
+    const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
+    const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = ['segments', 'total', 'sum', true];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, chart, 'stack_labels', `d${index}`, value))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(2, 'cell'), slotOf(3, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/stack_labels/);
+  });
+
   it('accepts ranked status tones from the shared tones type, and fails a tone outside its closed values or an empty status', () => {
     const type = shipped.find((id) => id.endsWith('.ranked_list_card.v1~'))!;
     const ranked = demoWidgets.find((widget) => widget.id.startsWith(type))!;

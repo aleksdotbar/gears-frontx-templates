@@ -723,3 +723,75 @@ describe('cartesian_chart point labels', () => {
     failsWith({ render: { series: [{ name: 'a', type: 'bar' }] }, data }, 'only a scatter series takes one');
   });
 });
+
+describe('cartesian_chart stack totals', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const RUNS: CartesianData = {
+    series: [
+      { name: 'passed', points: [{ x: 'Mon', y: 12 }, { x: 'Tue', y: 9 }, { x: 'Wed', y: 7 }] },
+      { name: 'failed', points: [{ x: 'Mon', y: 3 }, { x: 'Tue', y: 2 }, { x: 'Wed', y: 0 }] },
+      { name: 'cancelled', points: [{ x: 'Mon', y: 2 }, { x: 'Tue', y: null }, { x: 'Wed', y: null }] },
+    ],
+  };
+  const stacked = (extra: Partial<CartesianSeriesOption> = {}): CartesianSeriesOption[] => RUNS.series.map((series) => ({ name: series.name!, type: 'bar', stack_group: 'runs', ...extra }));
+  const labelsOf = (container: HTMLElement) =>
+    [...container.querySelectorAll('text.valueLabel')].filter((text) => text.textContent).map((text) => ({ text: text.textContent, x: Number(text.getAttribute('x')), y: Number(text.getAttribute('y')) }));
+  /** Each category's stack as the box around its drawn segments, in category order. */
+  const stacksOf = (container: HTMLElement) => {
+    const segments = bars(container).flat().filter((box) => box.width > 0 && box.height > 0);
+    const at = new Map<number, typeof segments>();
+    for (const box of segments) at.set(Math.round(box.x), [...(at.get(Math.round(box.x)) ?? []), box]);
+    return [...at.values()].map((boxes) => ({ left: boxes[0].x, right: boxes[0].x + boxes[0].width, top: Math.min(...boxes.map((box) => box.y)), bottom: Math.max(...boxes.map((box) => box.y + box.height)) }));
+  };
+
+  it('writes one label per stack with stack_labels total, the sum of its segments, over the top of the stack, also where its last segment is 0 or null', () => {
+    const { container } = render(<CartesianChart payload={{ render: { series: stacked(), value_labels: 'always', stack_labels: 'total' }, data: RUNS }} />);
+    const labels = labelsOf(container).sort((a, b) => a.x - b.x);
+    expect(labels.map((label) => label.text)).toEqual(['17', '11', '7']);
+    stacksOf(container).forEach((stack, index) => {
+      expect(labels[index].x, `centred on stack ${index}`).toBeGreaterThan(stack.left);
+      expect(labels[index].x, `centred on stack ${index}`).toBeLessThan(stack.right);
+      expect(labels[index].y, `over stack ${index}`).toBeLessThanOrEqual(stack.top);
+    });
+  });
+
+  it('writes the totals right of the stacks on a horizontal chart', () => {
+    const { container } = render(<CartesianChart payload={{ render: { orientation: 'horizontal', series: stacked(), value_labels: 'always', stack_labels: 'total' }, data: RUNS }} />);
+    const labels = labelsOf(container).sort((a, b) => a.y - b.y);
+    expect(labels.map((label) => label.text)).toEqual(['17', '11', '7']);
+    const ends = [...container.querySelectorAll('.recharts-bar-rectangle')].map((rect) => rectOf(rect.querySelector('.recharts-rectangle') ?? rect)).filter((box) => box.width > 0);
+    const right = Math.max(...ends.map((box) => box.x + box.width));
+    expect(labels[0].x).toBeGreaterThanOrEqual(right);
+  });
+
+  it('writes the delivered total of a percent stack, and the value of each bar outside any stack', () => {
+    const data: CartesianData = {
+      series: [...RUNS.series, { name: 'Target', points: [{ x: 'Mon', y: 20 }, { x: 'Tue', y: 20 }, { x: 'Wed', y: 20 }] }, { name: 'Budget', points: [{ x: 'Mon', y: 25 }, { x: 'Tue', y: 25 }, { x: 'Wed', y: 25 }] }],
+    };
+    const series = [...stacked(), { name: 'Target', type: 'bar' as const }, { name: 'Budget', type: 'bar' as const }];
+    const { container: percent } = render(<CartesianChart payload={{ render: { series: stacked(), stack_mode: 'percent', value_labels: 'always', stack_labels: 'total' }, data: RUNS }} />);
+    expect(labelsOf(percent).map((label) => label.text).sort()).toEqual(['11', '17', '7']);
+    cleanup();
+    const { container } = render(<CartesianChart payload={{ render: { series, value_labels: 'always', stack_labels: 'total' }, data }} />);
+    expect(labelsOf(container).map((label) => label.text).sort()).toEqual(['11', '17', '20', '20', '20', '25', '25', '25', '7']);
+  });
+
+  it('formats a total by the value_format, as the segments are', () => {
+    const { container } = render(<CartesianChart payload={{ render: { series: stacked(), value_labels: 'always', stack_labels: 'total' }, data: RUNS, value_format: { value_type: 'duration', unit: 'h' } }} />);
+    expect(labelsOf(container).map((label) => label.text).sort()).toEqual(['11 hr', '17 hr', '7 hr']);
+  });
+
+  it.each<[string, CartesianRender['stack_labels']]>([
+    ['no stack_labels', undefined],
+    ['stack_labels segments', 'segments'],
+  ])('writes each segment its own value with %s, as before', (_case, stack_labels) => {
+    const { container } = render(<CartesianChart payload={{ render: { series: stacked(), value_labels: 'always', ...(stack_labels ? { stack_labels } : {}) }, data: RUNS }} />);
+    expect(labelsOf(container).map((label) => label.text).sort()).toEqual(['12', '2', '2', '3', '7', '9']);
+  });
+
+  it('writes no total under value_labels never', () => {
+    const { container } = render(<CartesianChart payload={{ render: { series: stacked(), value_labels: 'never', stack_labels: 'total' }, data: RUNS }} />);
+    expect(labelsOf(container)).toEqual([]);
+  });
+});
