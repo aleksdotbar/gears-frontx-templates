@@ -636,6 +636,29 @@ describe('Dashboard on the real registry', () => {
     await waitFor(() => expect(widgetTexts()).toEqual(['Nothing in this window. Try a wider range.', 'No data to show', '—No valueDeploys', 'No data.']), { timeout: 5000 });
     expect(screen.queryByText('This widget cannot be shown')).toBeNull();
   }, 15_000);
+
+  it('names each widget by the title of its cell or larger view, and by its own name in a cell without a title', async () => {
+    const demo = DEMO_SERVED_FILE.instances.find((instance) => instance.id === DEMO_DASHBOARD_ID) as { layout: { cells: { widget: { id: string } }[] } };
+    const pie = demo.layout.cells.find((cell) => cell.widget.id.includes('.pie_chart.'))!;
+    const pieOf = (suffix: string, title?: string) => ({
+      id: pie.widget.id.replace(/[0-9a-f]{4}$/, suffix),
+      ...(title === undefined ? {} : { title }),
+      render: {},
+      data: { params: {}, transform: "{'slices': [{'label': 'Passed', 'value': 3}]}" },
+    });
+    const cells = [
+      { size: 'small', widget: pieOf('e001', 'Runs by outcome'), larger_view: pieOf('e002', 'Runs by outcome, all time') },
+      { size: 'small', widget: pieOf('e003') },
+      { size: 'small', widget: pieOf('e004', '  ') },
+    ];
+    const file: ServedFile = { ...DEMO_SERVED_FILE, instances: [...DEMO_SERVED_FILE.instances.filter((instance) => instance.id !== DEMO_DASHBOARD_ID), { ...demo, layout: { cells } }] };
+    const root = new DashboardRoot({ host: createMockHost({ delayMs: 0, file }), entries: WIDGET_ENTRIES, origin: 'http://localhost' });
+    const { container } = render(<Dashboard root={root} dashboardId={DEMO_DASHBOARD_ID} theme="light" language="en" variables={DEMO_VARIABLES} />);
+    const names = () => [...document.querySelectorAll<HTMLElement>('[data-widget-extension]')].map((host) => host.shadowRoot?.querySelector('[role="figure"]')?.getAttribute('aria-label'));
+    await waitFor(() => expect(names()).toEqual(['Runs by outcome', 'Chart', 'Chart']), { timeout: 5000 });
+    fireEvent.click(within(container).getByRole('button', { name: /larger/ }));
+    await waitFor(() => expect(names()).toContain('Runs by outcome, all time'), { timeout: 5000 });
+  }, 15_000);
 });
 
 // A product that edits or adds dashboards while the page is open reloads the root it already has.

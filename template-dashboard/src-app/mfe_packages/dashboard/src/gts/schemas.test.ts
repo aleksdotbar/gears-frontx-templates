@@ -231,6 +231,7 @@ describe('the render_widget action', () => {
     ['a compound duration', { value_format: { value_type: 'duration', unit: 'h', compound: true } }],
     ['decimals on a duration that is not compound', { value_format: { value_type: 'duration', unit: 'h', compound: false, decimals: 1 } }],
     ['an empty_text', { empty_text: 'Nothing in this window. Try a wider range.' }],
+    ['a title', { title: 'Open pull requests' }],
   ])('accepts a payload with %s', (_name, extra) => {
     expect(() => registry().register(action({ render: { label: 'Deploys' }, ...extra }))).not.toThrow();
   });
@@ -274,6 +275,19 @@ describe('the render_widget action', () => {
       paths = instancePathsOf(error);
     }
     expect(paths).toContain('/payload/empty_text');
+  });
+
+  it.each([
+    ['blank', ''],
+    ['not a string', 5],
+  ])('rejects a title that is %s', (_name, title) => {
+    let paths: string[] = [];
+    try {
+      registry().register(action({ render: {}, title }));
+    } catch (error) {
+      paths = instancePathsOf(error);
+    }
+    expect(paths).toContain('/payload/title');
   });
 
   it.each([
