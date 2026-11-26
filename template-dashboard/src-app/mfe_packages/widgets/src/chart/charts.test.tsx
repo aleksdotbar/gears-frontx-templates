@@ -554,6 +554,14 @@ describe('pie_chart', () => {
     expect(await within(region).findByText('South', { selector: '[aria-current="true"]' })).toBeTruthy();
   });
 
+  it('colours eight slices with eight palette steps, the kit series colours and then its categorical hues, and the ninth with the first', () => {
+    const slices = Array.from({ length: 9 }, (_, index) => ({ label: `Team ${index + 1}`, value: 10 - index }));
+    const { container } = render(<PieChart payload={{ render: {}, data: { slices } }} label="Commits by team" />);
+    const style = [...container.querySelectorAll('style')].map((element) => element.textContent).join('');
+    const colours = slices.map((_, index) => new RegExp(`--color-p${index}: ([^;]+);`).exec(style)?.[1]);
+    expect(colours).toEqual(['var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)', 'var(--chart-category-purple)', 'var(--chart-category-brown)', 'var(--chart-category-teal)', 'var(--chart-5)']);
+  });
+
   it('shows the empty state for no slices', () => {
     render(<PieChart payload={{ render: {}, data: { slices: [] } }} />);
     expect(screen.getByText('No data to show')).toBeTruthy();
@@ -1389,6 +1397,11 @@ describe('treemap_chart', () => {
     expect(within(container).queryByRole('button', { name: /^tiny:/ })).toBeNull();
     expect(within(container).getByRole('button', { name: /^huge:/ })).toBeTruthy();
     expect(rowsOf().slice(1).map((row) => row[0])).toEqual(['huge', 'tiny']);
+  });
+
+  it('colours eight tiles with eight palette steps, the kit series colours and then its categorical hues, and the ninth with the first', () => {
+    const { container } = draw(Array.from({ length: 9 }, (_, index) => ({ label: `repo-${index + 1}`, value: 100 - index, group: null })));
+    expect(tiles(container).map((tile) => tile.style.getPropertyValue('--tile'))).toEqual(['var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)', 'var(--chart-1)', 'var(--chart-3)', 'var(--chart-category-purple)', 'var(--chart-category-brown)', 'var(--chart-category-teal)', 'var(--chart-5)']);
   });
 
   it('names every tile and its value whatever the tile shows, and colours it by its palette place', () => {
