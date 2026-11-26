@@ -465,8 +465,12 @@ export function CartesianChart({
   // A date before the year 1 writes its era, so the year 0 (1 BC) does not read as the year 1.
   const tickDates = dateFormatOf(locale, days || last - first >= 2 * DAY ? dayFormat : oneDay ? { timeStyle } : { month: 'short', day: 'numeric', ...hours });
   const fullDates = dateFormatOf(locale, days ? dayFormat : { dateStyle: 'medium', timeStyle });
-  const xText = (value: string | number | null) => (axis === 'time' && typeof value === 'number' ? fullDates(value) : textOf(value, undefined, locale));
-  const tickText = (value: string | number | null) => (axis === 'time' && typeof value === 'number' ? tickDates(value) : textOf(value, undefined, locale));
+  const xFormat = axis === 'value' ? render.x_axis?.value_format : undefined;
+  const xText = (value: string | number | null) => (axis === 'time' && typeof value === 'number' ? fullDates(value) : textOf(value, xFormat, locale));
+  const tickText = (value: string | number | null) => {
+    if (typeof value !== 'number' || axis === 'category') return textOf(value, undefined, locale);
+    return axis === 'time' ? tickDates(value) : formatValue(value, xFormat, locale, 'compact');
+  };
   const xLabel = render.x_axis?.label ?? texts.columns.x;
   const sizeLabel = render.size_label ?? texts.columns.size;
   // Sized scatter points: the largest delivered size sets the largest bubble, so sizes of all series compare.
@@ -518,7 +522,6 @@ export function CartesianChart({
       column === 1 + shift ? xText(value) : column === 2 + shift ? formatSeries(seriesOfRow[row])(value) : column === 3 + shift ? formatSize(value) : format(value);
     const scatterSecondary = data.series.some((_, index) => onSecondary(index));
     const offsets = data.series.map((_, index) => data.series.slice(0, index).reduce((sum, series) => sum + series.points.length, 0));
-    // The first x tick sits at the smallest x.
     const xs = table.rows.map((row) => row[1 + shift]).filter((x): x is number => typeof x === 'number');
     // A reduce, not Math.min(...xs): spreading a very long series overflows the call stack.
     // A bubble at the edge of the data keeps its whole disc inside the plot: the axes leave the largest radius free at their ends.
@@ -540,7 +543,7 @@ export function CartesianChart({
             <ChartContainer config={config} style={FILL}>
               <ScatterChart margin={{ top: 8, right: 8, bottom: 0, left: firstOverhang }}>
                 <CartesianGrid />
-                <XAxis type="number" dataKey="x" name={xLabel} domain={['dataMin', 'dataMax']} padding={bubblePadding.x} tickLine={false} axisLine={false} tickFormatter={(value: number) => tickText(value)} height={xAxisHeight(table.rows.reduce((max, row) => Math.max(max, tickText(row[1 + shift]).length), 0))} label={titleOf(render.x_axis?.label, 'x')} {...xTick} />
+                <XAxis type="number" dataKey="x" name={xLabel} domain={axis === 'value' ? ['auto', 'auto'] : ['dataMin', 'dataMax']} padding={bubblePadding.x} tickLine={false} axisLine={false} tickFormatter={(value: number) => tickText(value)} height={xAxisHeight(table.rows.reduce((max, row) => Math.max(max, tickText(row[1 + shift]).length), 0))} label={titleOf(render.x_axis?.label, 'x')} {...xTick} />
                 <YAxis
                   yAxisId="primary"
                   tick={TICK}

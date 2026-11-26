@@ -205,6 +205,10 @@
                   "type": "string",
                   "description": "A title written under the x axis ticks, and the x column heading of the data view and the text alternative."
                 },
+                "value_format": {
+                  "$ref": "gts://gts.frontx.dashboard.widget.value_format.v1~",
+                  "description": "Optional format of the x numbers on a value axis, of the shared value_format type: the ticks in compact notation, as the y ticks, and the tooltip, the data view and the text alternative in full. A category or time axis ignores it. Without it, the x numbers show as plain numbers."
+                },
                 "tick_labels": {
                   "enum": [
                     "auto",

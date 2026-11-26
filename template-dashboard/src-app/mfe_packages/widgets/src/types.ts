@@ -38,6 +38,8 @@ export interface CartesianRender {
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;
+    /** A value axis only: the format of its numbers, in its ticks, the tooltip, the data view and the text alternative. */
+    value_format?: ValueFormat;
     /**
      * `auto` skips labels that would collide and keeps the first and the last category labelled; `every` labels every
      * category, thinning out only when they cannot fit. On a category axis either first cuts a level label longer than

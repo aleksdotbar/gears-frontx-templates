@@ -61,7 +61,7 @@ describe('cartesian_chart', () => {
     for (const tick of ticks) expect(tick.getAttribute('transform')).toContain('rotate(-90');
     // The axis grows for the rotated labels, so the plot above it ends higher than with level labels.
     const lowestYTick = (tick_angle: 0 | -90) => {
-      const { container: chart, unmount } = render(<CartesianChart payload={{ render: { x_axis: { type: 'value', tick_angle }, series: [{ name: 'a', type: 'scatter' }] }, data: { series: [{ name: 'a', points: [{ x: 1_000_000, y: 2 }, { x: 5_000_000, y: 3 }] }] } }} />);
+      const { container: chart, unmount } = render(<CartesianChart payload={{ render: { x_axis: { type: 'value', tick_angle }, series: [{ name: 'a', type: 'scatter' }] }, data: { series: [{ name: 'a', points: [{ x: 1_234_567, y: 2 }, { x: 5_678_901, y: 3 }] }] } }} />);
       const y = Math.max(...[...chart.querySelectorAll('.recharts-yAxis-tick-labels .recharts-cartesian-axis-tick-value')].map((tick) => Number(tick.getAttribute('y'))));
       unmount();
       return y;

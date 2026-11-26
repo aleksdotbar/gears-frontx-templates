@@ -383,6 +383,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/max_bar_width/);
   });
 
+  it('accepts a cartesian_chart x_axis.value_format of the shared value_format type, and fails one outside its closed values', () => {
+    const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
+    const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = [{ value_type: 'percent', decimals: 1 }, { value_type: 'money' }, { value_type: 'percent', unit: 's' }];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, chart, 'x_axis', `f${index}`, { ...(chart.render.x_axis as object), type: 'value', value_format: value }))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(1, 'cell'), slotOf(2, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(1, 'cell'))).toMatch(/\/render\/x_axis\/value_format/);
+  });
+
   it('accepts ranked status tones from the shared tones type, and fails a tone outside its closed values or an empty status', () => {
     const type = shipped.find((id) => id.endsWith('.ranked_list_card.v1~'))!;
     const ranked = demoWidgets.find((widget) => widget.id.startsWith(type))!;
