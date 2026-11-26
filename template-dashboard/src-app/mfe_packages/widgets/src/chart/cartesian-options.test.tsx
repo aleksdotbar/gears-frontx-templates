@@ -539,3 +539,53 @@ describe('cartesian_chart bubble sizes', () => {
     failsWith({ render: { series: [{ name: 'a', type: 'line' }] }, data }, 'only a scatter series takes one');
   });
 });
+
+describe('cartesian_chart value x axis', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const xTicksOf = (container: HTMLElement) => [...container.querySelectorAll('.recharts-xAxis-tick-labels .recharts-cartesian-axis-tick-value')].map((tick) => tick.textContent);
+  const SIZES: CartesianData = { series: [{ name: 'Review', points: [20, 140, 270, 410, 520, 690, 770, 893].map((x, index) => ({ x, y: index + 1 })) }] };
+  const SCATTER: CartesianRender = { x_axis: { type: 'value', label: 'Lines changed' }, series: [{ name: 'Review', type: 'scatter' }] };
+
+  it('ticks a scatter x axis at round values around its data, in compact notation', () => {
+    const { container } = render(<CartesianChart payload={{ render: SCATTER, data: SIZES }} />);
+    expect(xTicksOf(container)).toEqual(['0', '250', '500', '750', '1K']);
+  });
+
+  it.each<[string, CartesianRender['x_axis'], number[], string[], string]>([
+    ['a percent', { type: 'value', label: 'Coverage', value_format: { value_type: 'percent' } }, [0.05, 0.21, 0.38, 0.62], ['0%', '20%', '40%', '60%', '80%'], '21%'],
+    ['a duration', { type: 'value', label: 'Wait', value_format: { value_type: 'duration', unit: 'h' } }, [2, 9, 17, 31], ['0 hr', '8 hr', '16 hr', '24 hr', '32 hr'], '9 hr'],
+  ])('writes %s x by x_axis.value_format in the ticks, the tooltip, the data view and the text alternative', async (_case, x_axis, xs, ticks, second) => {
+    const user = userEvent.setup();
+    const data: CartesianData = { series: [{ name: 'Review', points: xs.map((x, index) => ({ x, y: index + 1 })) }] };
+    const { container } = render(<CartesianChart payload={{ render: { ...SCATTER, x_axis, drill_down: true }, data }} label="Spread" />);
+    expect(xTicksOf(container)).toEqual(ticks);
+    const rows = within(alternative('Spread')).getAllByRole('row', { hidden: true });
+    expect(within(rows[2]).getAllByRole('cell', { hidden: true })[1].textContent).toBe(second);
+    fireEvent.mouseEnter(container.querySelectorAll('.recharts-scatter-symbol')[1]);
+    fireEvent.mouseMove(container.querySelectorAll('.recharts-scatter-symbol')[1]);
+    await waitFor(() => expect(container.querySelector('.recharts-tooltip-wrapper')?.textContent).toContain(`${x_axis?.label}${second}`));
+    await user.click(screen.getByRole('button', { name: 'Show data' }));
+    const region = await screen.findByRole('region', { name: 'Data of Spread' });
+    expect(within(region).getAllByRole('row').map((row) => row.textContent)).toEqual(expect.arrayContaining([`Review${second}2`]));
+  });
+
+  it('writes the x of a line on a value axis by x_axis.value_format too', () => {
+    const data: CartesianData = { series: [{ name: 'Load', points: [{ x: 0.1, y: 3 }, { x: 0.5, y: 7 }, { x: 0.9, y: 4 }] }] };
+    const { container } = render(<CartesianChart payload={{ render: { x_axis: { type: 'value', value_format: { value_type: 'percent' } }, series: [{ name: 'Load', type: 'line' }] }, data }} label="Load" />);
+    expect(xTicksOf(container).every((tick) => tick?.endsWith('%'))).toBe(true);
+    expect(within(alternative('Load')).getAllByRole('row', { hidden: true }).slice(1).map((row) => row.textContent)).toEqual(['10%3', '50%7', '90%4']);
+  });
+
+  it.each<[string, CartesianData, CartesianRender]>([
+    ['a category', { series: [{ name: 'Runs', points: [{ x: 2024, y: 3 }, { x: 2025, y: 5 }] }] }, { x_axis: { type: 'category' }, series: [{ name: 'Runs', type: 'bar' }] }],
+    ['a time', { series: [{ name: 'Runs', points: [{ x: '2026-10-01', y: 3 }, { x: '2026-10-09', y: 5 }] }] }, { x_axis: { type: 'time' }, series: [{ name: 'Runs', type: 'scatter' }] }],
+  ])('leaves the x of %s axis as before with x_axis.value_format, in the ticks and the text alternative', (_case, data, chart) => {
+    const xsOf = (label: string) => within(alternative(label)).getAllByRole('row', { hidden: true }).map((row) => within(row).queryAllByRole('cell', { hidden: true })[0]?.textContent);
+    const { container, unmount } = render(<CartesianChart payload={{ render: chart, data }} label="Plain" />);
+    const before = { ticks: xTicksOf(container), xs: xsOf('Plain') };
+    unmount();
+    const { container: formatted } = render(<CartesianChart payload={{ render: { ...chart, x_axis: { ...chart.x_axis, value_format: { value_type: 'percent' } } }, data }} label="Formatted" />);
+    expect({ ticks: xTicksOf(formatted), xs: xsOf('Formatted') }).toEqual(before);
+  });
+});

@@ -1,3 +1,5 @@
+import type { ValueFormat } from '@gears-frontx/frontx-dashboard-root/contract';
+
 /*
  * The render options and data shapes of the catalog widget types this package
  * draws, as the widget catalog FEATURE declares them. The widget type and data
@@ -32,6 +34,8 @@ export interface CartesianRender {
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;
+    /** A value axis only: the format of its numbers, in its ticks, the tooltip, the data view and the text alternative. */
+    value_format?: ValueFormat;
     /** `auto` skips labels that would collide; `every` labels every category, thinning out only when they cannot fit. */
     tick_labels?: 'auto' | 'every';
     tick_angle?: 0 | -45 | -90;
