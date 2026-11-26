@@ -416,7 +416,7 @@ export function CartesianChart({
   if (nonFinite) return <WidgetCannotBeShown texts={texts} problem={nonFinite} />;
   const problem = checkCartesian(render, data);
   if (problem) return <WidgetCannotBeShown texts={texts} problem={problem} />;
-  if (data.series.length === 0 || data.series.every((series) => series.points.length === 0)) return <WidgetEmpty texts={texts} />;
+  if (data.series.length === 0 || data.series.every((series) => series.points.length === 0)) return <WidgetEmpty texts={texts} text={payload.empty_text} />;
 
   const axis = render.x_axis?.type ?? 'category';
   const optionOf = (name: string | null) => seriesOptionOf(render, name);

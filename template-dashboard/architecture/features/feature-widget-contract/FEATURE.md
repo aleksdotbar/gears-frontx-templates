@@ -252,7 +252,7 @@ The operand of `x-gts-instance-ref` on the `id` field is the literal base type, 
 
 - [ ] `p1` - **ID**: `cpt-frontx-dashboard-dod-widget-contract-data-widget`
 
-The system **MUST** ship an abstract `data_widget` between the base and every data-taking type, deriving from the widget base, with a required `data` (the binding, a `oneOf` of three closed forms: own, shared, static), an optional `value_format`, and the `data_type` trait schema (`x-gts-type-ref` to the widget-data base). `markdown_card` derives from the widget base directly and forbids `data`.
+The system **MUST** ship an abstract `data_widget` between the base and every data-taking type, deriving from the widget base, with a required `data` (the binding, a `oneOf` of three closed forms: own, shared, static), an optional `value_format`, an optional `empty_text`, and the `data_type` trait schema (`x-gts-type-ref` to the widget-data base). `markdown_card` derives from the widget base directly and forbids `data`.
 
 The binding is the data contract a dashboard author writes. A data widget's `data` has exactly one of three forms; `request` is mutually exclusive with both `source` and `params`, and `params` is allowed only with `source` or alone:
 
@@ -261,6 +261,8 @@ The binding is the data contract a dashboard author writes. A data widget's `dat
 - **static:** `{params?, transform}`: `params` is any JSON object (absent means `{}`). `transform` is a CEL expression whose single variable is `params`.
 
 `value_format` says how the widget formats the numbers it shows: `{value_type: number | percent | duration | currency, unit?, compound?, currency?, decimals?, unit_label?}`. `percent` 0.25 means 25%. `unit` is required when `value_type` is `duration` and is one of `ms` (milliseconds), `s` (seconds), `min` (minutes), `h` (hours) or `d` (days); the value is a number in that unit. `unit` is not allowed with another value type. `compound` (a boolean, `duration` only) set to true shows the duration as its two largest whole parts with narrow unit labels: 52 `h` shows as 2d 4h, 90 `s` as 1m 30s, and 120 `ms` as 120ms. Each part rounds to the precision of the part after it and carries, so 59.6 `s` shows as 1m. A value below one second shows in whole milliseconds. A compound duration takes no `decimals`, and compact notation does not change it. Without `compound`, or when it is false, the value shows in its unit. `currency` is an ISO 4217 code such as `EUR`, required when `value_type` is `currency` and not allowed otherwise; the schema checks only the code's shape (three capital letters). The value is an amount in that currency, shown with the symbol the host's locale data gives for the host language; a code that data does not know shows as the code itself. `decimals` (0 to 6, any value type) is the exact number of fraction digits shown; without it a number shows up to three, a percent up to two and a currency the digits of its code. `unit_label` (1 to 24 characters, `number` only) is a unit word shown after the number with a no-break space, such as `lines`, except in a `metric_card` headline, where it follows an ordinary space so a narrow card wraps it under the number, which stays whole; without it the number shows alone. Compact notation keeps each of these. No other field is allowed. It is the closed value_format type `gts.frontx.dashboard.widget.value_format.v1~`, which `data_widget` and the `render_widget` payload both refer to. It sits on `data_widget`, so every data widget type inherits it and declares nothing for it; each type closes only its own `render`. A `grid` column also refers to it, for the format of that column's numbers in place of the widget's, as the widget catalog describes.
+
+`empty_text` (1 to 160 characters) is the text the widget shows in its empty state, when its data meets the empty condition of its data type. Without it, the widget shows its own English "No data to show". The root sends it to the widget in the `render_widget` payload. A product sets it per cell, for example to say that a time window holds no data.
 
 **Schema**:
 
@@ -291,6 +293,12 @@ The binding is the data contract a dashboard author writes. A data widget's `dat
         "value_format": {
           "$ref": "gts://gts.frontx.dashboard.widget.value_format.v1~",
           "description": "How the widget formats the numbers it shows. percent 0.25 means 25%."
+        },
+        "empty_text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "description": "The text the widget shows in its empty state, in place of its own English No data to show."
         },
         "data": {
           "oneOf": [
@@ -513,7 +521,7 @@ The transform result, the data a widget receives, must not carry a top-level fie
 
 - [ ] `p1` - **ID**: `cpt-frontx-dashboard-dod-widget-contract-render-action`
 
-The system **MUST** ship the `render_widget {render, value_format?, data?}` action type. `render` is the stamped render instance: the widget instance's `render` object with the `id` the root stamps, validated with the widget instance against its own type and registered against the widget type's render type before the action is sent. The payload checks it against the render base, so it is an object whose `id`, when present, names a registered render instance; the check that it is the widget type's own render type is that registration by the root, not the action. The widget receives `render.id` and ignores it. `value_format` is the data widget's value format, when it has one, checked against the closed value_format type; `data` is the stamped data instance, already validated against its data type. The widget gets nothing else: not the widget id, not the title (the root draws it in the cell frame), and not the binding. The widget renders the payload, including its own empty state, and makes no requests. The root sends it once `mount_ext` has finished and the data is valid; a `markdown_card` cell gets `render_widget {render}` at once, with no loader.
+The system **MUST** ship the `render_widget {render, value_format?, empty_text?, data?}` action type. `render` is the stamped render instance: the widget instance's `render` object with the `id` the root stamps, validated with the widget instance against its own type and registered against the widget type's render type before the action is sent. The payload checks it against the render base, so it is an object whose `id`, when present, names a registered render instance; the check that it is the widget type's own render type is that registration by the root, not the action. The widget receives `render.id` and ignores it. `value_format` is the data widget's value format, when it has one, checked against the closed value_format type; `empty_text` is the data widget's `empty_text`, when it has one; `data` is the stamped data instance, already validated against its data type. The widget gets nothing else: not the widget id, not the title (the root draws it in the cell frame), and not the binding. The widget renders the payload, including its own empty state, and makes no requests. The root sends it once `mount_ext` has finished and the data is valid; a `markdown_card` cell gets `render_widget {render}` at once, with no loader.
 
 **Schema**:
 
@@ -546,6 +554,11 @@ The system **MUST** ship the `render_widget {render, value_format?, data?}` acti
             "value_format": {
               "$ref": "gts://gts.frontx.dashboard.widget.value_format.v1~",
               "description": "Data widget only: the widget instance's value_format."
+            },
+            "empty_text": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Data widget only: the widget instance's empty_text, which the widget shows in its empty state."
             },
             "data": {
               "$ref": "gts://gts.frontx.dashboard.widget_data.widget_data.v1~",
@@ -810,7 +823,7 @@ A walkthrough with someone who did not build the template verifies the guide. A 
 - [ ] A new widget type added to the served file is usable by existing dashboards at once; a fix released under the same widget type shows on the next page load; neither needs a product redeploy.
 - [ ] Restoring the previous widget type, data type and render type in the bundle's `mfe.json` with the entry and the manifest, and rebuilding its part, or redeploying the previous MFE build with its part, restores the previous widget on the next page load.
 - [ ] The root resolves effective traits as the RFC 7396 merge along the `$id` chain, with defaults filled; a schema missing along the type chain is a failure, never a partial result.
-- [ ] The `render_widget` action carries a single `target` (a `widget_ext` extension) and a closed payload of `{render, value_format?, data?}`: the stamped render instance (of the render base, its `id` naming a registered render instance) and, for a data widget, its `value_format` (of the value_format type) and the stamped data instance. It carries no widget id, title or binding.
+- [ ] The `render_widget` action carries a single `target` (a `widget_ext` extension) and a closed payload of `{render, value_format?, empty_text?, data?}`: the stamped render instance (of the render base, its `id` naming a registered render instance) and, for a data widget, its `value_format` (of the value_format type), its `empty_text` and the stamped data instance. It carries no widget id, title or binding.
 - [ ] The `widgets` extension type narrows `domain` to the `widgets` domain id and adds no field; a generated extension's `entry` is the entry named by the widget type's `entry` trait.
 - [ ] The `widgets` domain instance declares `sharedProperties` theme and language, `actions` `mount_ext` and `unmount_ext`, `extensionsActions` `render_widget`, `extensionsTypeId` the `widget_ext` extension type, `defaultActionTimeout` 30000, and both lifecycle-stage lists empty.
 - [ ] The domain and every entry refer to the FrontX theme and language ids; the root registers the template's minimal schema for each only when the type store has none under that id, and never replaces a schema already registered.

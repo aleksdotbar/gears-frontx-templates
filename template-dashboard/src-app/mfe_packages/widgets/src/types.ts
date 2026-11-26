@@ -156,11 +156,13 @@ export interface MetricCardRender {
   reference_label?: string;
   /** A link at the card's foot. */
   link?: WidgetLink;
+  /** What a null `value` shows: the empty state (`empty`, when absent), or a dash as the headline with the rest of the card (`dash`). */
+  null_value?: 'empty' | 'dash';
 }
 
 export interface MetricCardData {
-  /** The headline. Null is the data type's empty condition. */
-  value: number | null;
+  /** The headline. Absent is the data type's empty condition, and so is null unless the render's `null_value` is `dash`. */
+  value?: number | null;
   /**
    * The value the trend compares with. Absent or null shows no trend; 0 shows
    * the direction icon alone, without a change.

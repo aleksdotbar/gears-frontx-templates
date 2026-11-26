@@ -15,6 +15,9 @@ const FILL = { '--chart-aspect-ratio': 'auto', blockSize: '100%', inlineSize: '1
 
 const SPARK_CONFIG: ChartConfig = { y: { color: 'var(--chart-5)' } };
 
+/** The headline of a null value under `null_value: dash`. */
+const DASH = '\u2014';
+
 /** How the headline sits against `previous_value`: the direction, and the relative change when there is one. */
 interface Trend {
   direction: 'up' | 'down' | 'flat';
@@ -129,13 +132,14 @@ export function MetricCard({
   if (!data) return <WidgetCannotBeShown texts={texts} problem="metric_card: no data" />;
   const nonFinite = nonFiniteProblemOf('metric_card', payload);
   if (nonFinite) return <WidgetCannotBeShown texts={texts} problem={nonFinite} />;
-  if (data.value === null) return <WidgetEmpty texts={texts} />;
+  const value = data.value ?? null;
+  if (data.value === undefined || (value === null && render.null_value !== 'dash')) return <WidgetEmpty texts={texts} text={payload.empty_text} />;
 
   // The headline shows the unit word as its own piece, so the number is formatted without it.
   const unit = value_format?.value_type === 'number' ? value_format.unit_label : undefined;
   const numberFormat = value_format?.value_type === 'number' ? { ...value_format, unit_label: undefined } : value_format;
-  const trend = trendOf(data.value, data.previous_value);
-  const reference = typeof data.reference_value === 'number' ? data.reference_value : null;
+  const trend = value === null ? null : trendOf(value, data.previous_value);
+  const reference = value !== null && typeof data.reference_value === 'number' ? data.reference_value : null;
   // One point per step; a single point draws no line.
   const steps = (data.sparkline ?? []).map((y, index) => ({ step: index, y }));
   return (
@@ -143,8 +147,15 @@ export function MetricCard({
       <div className={styles.metricHead}>
         {/* The unit word is its own piece after an ordinary space: in a narrow card it wraps under the number, which stays whole. */}
         <Text typography="kpi" render={<strong />}>
-          {formatValue(data.value, numberFormat, locale)}
-          {unit ? (
+          {value === null ? (
+            <>
+              <span aria-hidden="true">{DASH}</span>
+              <VisuallyHidden>{texts.metric.noValue}</VisuallyHidden>
+            </>
+          ) : (
+            formatValue(value, numberFormat, locale)
+          )}
+          {unit && value !== null ? (
             <>
               {' '}
               <span className={styles.metricUnit}>{unit}</span>
@@ -160,7 +171,7 @@ export function MetricCard({
                 {render.value_label}
               </Text>
             ) : null}
-            {reference !== null ? <Reference value={data.value} reference={reference} render={render} valueFormat={value_format} texts={texts} locale={locale} /> : null}
+            {value !== null && reference !== null ? <Reference value={value} reference={reference} render={render} valueFormat={value_format} texts={texts} locale={locale} /> : null}
           </div>
         ) : null}
       </div>

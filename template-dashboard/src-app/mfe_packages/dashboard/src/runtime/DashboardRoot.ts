@@ -519,7 +519,7 @@ export class DashboardRoot {
         } catch (error) {
           throw new CellFailure('data', `the data fails ${dataType}: ${String(error).split('\n').slice(0, 2).join(' ')}`);
         }
-        payload = { ...payload, ...(widget.value_format ? { value_format: widget.value_format } : {}), data: stamped };
+        payload = { ...payload, ...(widget.value_format ? { value_format: widget.value_format } : {}), ...(widget.empty_text ? { empty_text: widget.empty_text } : {}), data: stamped };
       }
     } catch (error) {
       if (!isCurrent()) return;

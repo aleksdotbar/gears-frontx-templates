@@ -45,6 +45,8 @@ export interface WidgetInstance {
   render: Record<string, unknown>;
   /** Data widgets only. */
   value_format?: ValueFormat;
+  /** Data widgets only: the text of the widget's empty state, in place of its own English one. */
+  empty_text?: string;
   /** Data widgets only: the binding (ADR-0011). */
   data?: unknown;
 }
@@ -80,6 +82,8 @@ export interface Dashboard {
 export interface RenderWidgetPayload<TRender = Record<string, unknown>, TData = unknown> {
   render: TRender;
   value_format?: ValueFormat;
+  /** The text of the widget's empty state; without it, the widget's own English text. */
+  empty_text?: string;
   data?: TData;
 }
 

@@ -230,6 +230,7 @@ describe('the render_widget action', () => {
     ['decimals on a duration', { value_format: { value_type: 'duration', unit: 's', decimals: 1 } }],
     ['a compound duration', { value_format: { value_type: 'duration', unit: 'h', compound: true } }],
     ['decimals on a duration that is not compound', { value_format: { value_type: 'duration', unit: 'h', compound: false, decimals: 1 } }],
+    ['an empty_text', { empty_text: 'Nothing in this window. Try a wider range.' }],
   ])('accepts a payload with %s', (_name, extra) => {
     expect(() => registry().register(action({ render: { label: 'Deploys' }, ...extra }))).not.toThrow();
   });
@@ -260,6 +261,19 @@ describe('the render_widget action', () => {
       paths = instancePathsOf(error);
     }
     expect(paths).toContain(path);
+  });
+
+  it.each([
+    ['blank', ''],
+    ['not a string', 5],
+  ])('rejects an empty_text that is %s', (_name, emptyText) => {
+    let paths: string[] = [];
+    try {
+      registry().register(action({ render: {}, empty_text: emptyText }));
+    } catch (error) {
+      paths = instancePathsOf(error);
+    }
+    expect(paths).toContain('/payload/empty_text');
   });
 
   it.each([
