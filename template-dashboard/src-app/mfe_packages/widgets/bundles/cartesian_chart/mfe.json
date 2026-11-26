@@ -264,6 +264,11 @@
               "default": "never",
               "description": "Values written at the end of the bars (above a bar that grows up, below one that grows down; a zero bar has none): always, never, or auto when every bar is wide enough for its value. Without it, never."
             },
+            "max_bar_width": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Optional largest thickness of a bar in pixels: its width on a vertical chart, its height on a horizontal one. A bar stays centred in its band, and the band keeps its width. value_labels auto judges the drawn width. Without it, a bar takes its share of 80% of its band."
+            },
             "drill_down": {
               "type": "boolean",
               "default": false,

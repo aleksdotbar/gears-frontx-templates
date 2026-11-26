@@ -41,6 +41,8 @@ export interface CartesianRender {
   legend_position?: LegendPosition;
   /** Values written at the bars' ends (below a bar that grows down): `auto` when every bar is wide enough. */
   value_labels?: 'auto' | 'always' | 'never';
+  /** The largest thickness of a bar in pixels: its width on a vertical chart, its height on a horizontal one. */
+  max_bar_width?: number;
   /** Marks open the data view with the picked row expanded, and a button opens the whole data view. */
   drill_down?: boolean;
   /** `horizontal` puts the categories on the vertical axis and the values on the horizontal one; a category x axis only. */

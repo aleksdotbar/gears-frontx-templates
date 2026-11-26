@@ -656,7 +656,7 @@ export function CartesianChart({
   const plotWidth = horizontal ? width - categoryWidth - 8 : width - primaryWidth - (secondary ? secondaryWidth : 8) - rotatedOverhang;
   // A horizontal bar's thickness: its share of the plot's height.
   const plotHeight = height - valueAxisHeight('primary') - (secondary ? valueAxisHeight('secondary') : 0) - 8;
-  const barWidth = barSlots > 0 && rows.length > 0 ? ((horizontal ? plotHeight : plotWidth) * 0.8) / rows.length / barSlots : 0;
+  const barWidth = barSlots > 0 && rows.length > 0 ? Math.min(((horizontal ? plotHeight : plotWidth) * 0.8) / rows.length / barSlots, render.max_bar_width ?? Infinity) : 0;
   const labels = render.value_labels ?? 'never';
   // A horizontal bar needs the height of its value's line, a vertical one the width of a value.
   const showValues = barSlots > 0 && (labels === 'always' || (labels === 'auto' && barWidth >= (horizontal ? VALUE_LABEL_HEIGHT + 2 : MIN_LABELLED_BAR)));
@@ -771,6 +771,7 @@ export function CartesianChart({
             <ComposedChart
               data={rows}
               layout={horizontal ? 'vertical' : 'horizontal'}
+              maxBarSize={render.max_bar_width}
               margin={{
                 top: horizontal ? 8 : showValues && hasEndLabel ? 34 : showValues || hasEndLabel || hasMaxMark ? 20 : 8,
                 // A horizontal chart writes bar values and line names right of their ends.
