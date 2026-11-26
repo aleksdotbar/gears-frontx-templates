@@ -2212,6 +2212,11 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
       "type": "object",
       "required": ["body"],
       "properties": {
+        "tone": {
+          "enum": ["default", "destructive"],
+          "default": "default",
+          "description": "Optional tone of the card: destructive writes the body in the kit's destructive colour and marks the card as an alert (role alert), for a note that something is wrong, such as a widget that is no longer on the dashboard. default (the default) writes it in the text colour."
+        },
         "body": {
           "type": "string",
           "minLength": 1,
@@ -2233,6 +2238,7 @@ One `entry_mf` instance per widget type, each in its own widget bundle (`widgets
 - Rendering: the card renders right after `render_widget`, with no data states, and sends no request.
 - Markdown: the body is typical markdown, CommonMark including links and images. The card shows the formatting, the links, and the images.
 - Section heading: with `heading_style` of `section`, each heading of the body draws as a small uppercase section heading: the kit's label size, weight and line height, in the muted colour. A product puts such a card, frameless, over a group of cells. The heading level does not change, so `## Section` stays an `h2`.
+- Tone: with `tone` of `destructive`, the body and its headings show in the kit's destructive colour (`--destructive`), and the card has `role="alert"`, so assistive technology announces it. A product uses it for a note that something is wrong, such as a widget that is no longer on the dashboard.
 - Safety: embedded HTML, links and images follow `cpt-frontx-dashboard-algo-widget-catalog-markdown`.
 - Other widgets: the markdown card is the only widget that interprets markup. Every other delivered text is rendered as text.
 

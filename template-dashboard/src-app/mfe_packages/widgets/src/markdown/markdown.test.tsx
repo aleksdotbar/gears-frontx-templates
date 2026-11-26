@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import { isLinkActive, isSameOriginImage } from './markdownModel';
@@ -39,6 +39,19 @@ describe('markdown_card', () => {
     const root = container.querySelector('.markdown')!;
     expect(root.classList.contains('markdownSection'), `should carry the section look: ${String(headingStyle)}`).toBe(section);
     expect(root.innerHTML).toBe('<h2>Delivery</h2>\n<p>A paragraph.</p>\n');
+  });
+
+  it('makes a card of tone destructive an alert with the destructive look, and keeps its body', () => {
+    render(<MarkdownCard payload={{ render: { body: 'This widget is no longer on the dashboard.', tone: 'destructive' } }} />);
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toBe('This widget is no longer on the dashboard.\n');
+    expect(alert.classList.contains('markdownDestructive')).toBe(true);
+  });
+
+  it.each(['default', undefined] as const)('makes a card of tone %s no alert, with no destructive look', (tone) => {
+    const { container } = render(<MarkdownCard payload={{ render: { body: 'Notes', ...(tone ? { tone } : {}) } }} />);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(container.querySelector('.markdownDestructive')).toBeNull();
   });
 
   it('shows embedded HTML as text and creates no element from it', () => {

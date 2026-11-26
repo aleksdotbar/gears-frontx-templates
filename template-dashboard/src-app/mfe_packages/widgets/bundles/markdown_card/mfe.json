@@ -35,6 +35,14 @@
             "body"
           ],
           "properties": {
+            "tone": {
+              "enum": [
+                "default",
+                "destructive"
+              ],
+              "default": "default",
+              "description": "Optional tone of the card: destructive writes the body in the kit's destructive colour and marks the card as an alert (role alert), for a note that something is wrong, such as a widget that is no longer on the dashboard. default (the default) writes it in the text colour."
+            },
             "body": {
               "type": "string",
               "minLength": 1,

@@ -232,6 +232,8 @@ export interface HeatmapData {
 
 /** The `markdown_card` render: the CommonMark body to show, with embedded HTML as text. It carries no data. */
 export interface MarkdownCardRender {
+  /** `destructive` writes the body in the destructive colour and makes the card an alert; `default` (when absent) does neither. */
+  tone?: 'default' | 'destructive';
   body: string;
   /** `section` draws each heading of the body as a small uppercase section heading; `default` (when absent) as a title. */
   heading_style?: 'default' | 'section';
