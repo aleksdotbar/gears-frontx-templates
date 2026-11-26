@@ -1,11 +1,11 @@
 import { useLayoutEffect, useReducer, useRef, type ReactNode, type RefObject } from 'react';
 import { ExpandIcon } from 'lucide-react';
 import {
+  Badge,
   Button,
   Card,
   CardAction,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
   Dialog,
@@ -206,8 +206,8 @@ export interface LargerView {
 // @cpt-dod:cpt-frontx-dashboard-dod-dashboard-runtime-frame:p1
 /**
  * The frame the dashboard root draws around every cell whose `frame` is not false: the widget's title,
- * its optional description line under the title, the loader, the cannot-be-shown state, the host's actions and, only when
- * the cell has a larger view, the button that opens it in an overlay inside the root's container.
+ * its optional description as a badge beside the cell's actions, the loader, the cannot-be-shown state, the host's
+ * actions and, only when the cell has a larger view, the button that opens it in an overlay inside the root's container.
  */
 export function CellFrame({
   title,
@@ -226,7 +226,7 @@ export function CellFrame({
   /** `false`: no card, header or larger-view button; the states and the widget sit straight in the grid cell. */
   frame?: boolean;
   title?: string;
-  /** A short line under the title, one line with an ellipsis; without it the header shows the title alone. */
+  /** A short text in a badge beside the cell's actions, cut with an ellipsis; without it the header shows the title alone. */
   description?: string;
   state: CellState;
   /** The kind of the failure in the cannot-be-shown state, which picks its text from `texts.cannotBeShownFor`. */
@@ -262,13 +262,13 @@ export function CellFrame({
       {title || description || largerView || actions?.length ? (
         <CardHeader>
           {title ? <CardTitle>{title}</CardTitle> : null}
-          {description ? (
-            <CardDescription className={styles.description} title={description}>
-              {description}
-            </CardDescription>
-          ) : null}
-          {largerView || actions?.length ? (
+          {description || largerView || actions?.length ? (
             <CardAction className={styles.actions}>
+              {description ? (
+                <Badge variant="secondary" className={styles.description} title={description}>
+                  <span className={styles.descriptionText}>{description}</span>
+                </Badge>
+              ) : null}
               <ActionButtons actions={actions} />
               {largerView ? (
                 <Dialog onOpenChange={(open) => largerView.onOpenChange?.(open)}>

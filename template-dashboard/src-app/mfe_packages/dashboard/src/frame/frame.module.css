@@ -23,12 +23,14 @@
   padding-inline: calc(var(--border-width) + var(--space-3));
 }
 
-/* The description under the title stays on one line; the full text is in its title attribute. */
 .description {
+  max-inline-size: 10rem;
+}
+
+.descriptionText {
   min-inline-size: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .body {
