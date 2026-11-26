@@ -886,3 +886,28 @@ describe('cartesian_chart value x axis', () => {
     expect({ ticks: xTicksOf(formatted), xs: xsOf('Formatted') }).toEqual(before);
   });
 });
+
+describe('cartesian_chart series tones', () => {
+  afterEach(cleanup);
+  /** The colour the chart gives a series key, which its bars, lines, points, legend mark and tooltip mark read. */
+  const colourOf = (container: HTMLElement, key: string) => new RegExp(`--color-${key}: ([^;]+);`).exec([...container.querySelectorAll('style')].map((element) => element.textContent).join(''))?.[1];
+
+  it('draws a toned series in its tone colour, and each other series keeps the palette colour of its position', () => {
+    const { container } = render(<CartesianChart payload={{ render: { series_tones: { Closed: 'danger' } }, data: TEAMS }} label="Tickets" />);
+    expect([colourOf(container, 's0'), colourOf(container, 's1')]).toEqual(['var(--chart-5)', 'var(--danger)']);
+  });
+
+  it('gives each of the five tones its kit colour, to a listed and to an unlisted series', () => {
+    const tones = ['neutral', 'success', 'warning', 'danger', 'info'] as const;
+    const data: CartesianData = { series: tones.map((tone) => ({ name: tone, points: [{ x: 'Web', y: 1 }] })) };
+    const series: CartesianSeriesOption[] = [{ name: 'neutral', type: 'line' }];
+    const { container } = render(<CartesianChart payload={{ render: { series, series_tones: Object.fromEntries(tones.map((tone) => [tone, tone])) }, data }} label="Tones" />);
+    expect(tones.map((_, index) => colourOf(container, `s${index}`))).toEqual(['var(--muted-foreground)', 'var(--success)', 'var(--warning)', 'var(--danger)', 'var(--info)']);
+  });
+
+  it('keeps the palette colour of a series named like an object property, and of an unnamed series', () => {
+    const data: CartesianData = { series: ['toString', 'constructor', null].map((name) => ({ name, points: [{ x: 'Web', y: 1 }] })) };
+    const { container } = render(<CartesianChart payload={{ render: { series_tones: { other: 'danger' } }, data }} label="Names" />);
+    expect([0, 1, 2].map((index) => colourOf(container, `s${index}`))).toEqual(['var(--chart-5)', 'var(--chart-4)', 'var(--chart-2)']);
+  });
+});

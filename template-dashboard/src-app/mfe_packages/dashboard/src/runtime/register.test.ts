@@ -383,6 +383,16 @@ describe('registration order under reference lookup', () => {
     expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/max_bar_width/);
   });
 
+  it('accepts a cartesian_chart series_tones of the shared tones, and fails a tone outside them', () => {
+    const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
+    const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;
+    const { types } = loaded();
+    const values = [{ failed: 'danger', ok: 'success' }, {}, { failed: 'red' }];
+    const result = registerDashboard(types, dashboardOf(values.map((value, index) => withRender(type, chart, 'series_tones', `c${index}`, value))));
+    expect(result.ok && [...result.failed.keys()]).toEqual([slotOf(2, 'cell')]);
+    expect(result.ok && result.failed.get(slotOf(2, 'cell'))).toMatch(/\/render\/series_tones/);
+  });
+
   it('accepts a cartesian_chart x_axis.value_format of the shared value_format type, and fails one outside its closed values', () => {
     const type = shipped.find((id) => id.endsWith('.cartesian_chart.v1~'))!;
     const chart = demoWidgets.find((widget) => widget.id.startsWith(type))!;

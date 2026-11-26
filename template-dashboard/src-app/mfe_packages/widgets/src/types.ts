@@ -35,6 +35,8 @@ export interface CartesianRender {
   unlisted_type?: CartesianSeriesOption['type'];
   /** The stack group of each data series without an entry in `series`: such a series draws on the primary axis, stacked in this group. */
   unlisted_stack_group?: string;
+  /** The tone of each data series by its name, drawn in place of its palette colour; a series with no tone keeps its palette colour. */
+  series_tones?: Tones;
   x_axis?: {
     type?: 'category' | 'value' | 'time';
     label?: string;

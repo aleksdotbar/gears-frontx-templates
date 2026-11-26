@@ -4,6 +4,7 @@ import type { RenderWidgetPayload } from '@gears-frontx/frontx-dashboard-root/co
 
 import { formatShare, formatValue, textOf, nonFiniteProblemOf } from '../format';
 import { legendOf, PALETTE } from './legend';
+import { TONE_COLORS } from './palette';
 import { dateFormatOf, timeOf as timeOfText } from '../time';
 import { DEFAULT_WIDGET_TEXTS, ValuesText, WidgetCannotBeShown, WidgetEmpty, type WidgetTexts } from '../states';
 import type { CartesianData, CartesianRender, CartesianSeriesOption, ReferenceLineOption } from '../types';
@@ -424,7 +425,9 @@ export function CartesianChart({
   const axis = render.x_axis?.type ?? 'category';
   const optionOf = (name: string | null) => seriesOptionOf(render, name);
   const typeOf = (name: string | null) => optionOf(name)?.type ?? 'bar';
-  const config: ChartConfig = Object.fromEntries(data.series.map((series, index) => [`s${index}`, { label: series.name ?? '', color: PALETTE[index % PALETTE.length] }]));
+  const tones = render.series_tones ?? {};
+  const colorOf = (name: string | null, index: number) => (name !== null && Object.hasOwn(tones, name) ? TONE_COLORS[tones[name]] : PALETTE[index % PALETTE.length]);
+  const config: ChartConfig = Object.fromEntries(data.series.map((series, index) => [`s${index}`, { label: series.name ?? '', color: colorOf(series.name, index) }]));
   const format = (value: string | number | null) => (typeof value === 'number' ? formatValue(value, value_format, locale) : (value ?? ''));
   const unit = render.y_axis_secondary?.unit ?? '';
   // A series on the secondary axis shows plain numbers with that axis's unit; the others follow value_format.
