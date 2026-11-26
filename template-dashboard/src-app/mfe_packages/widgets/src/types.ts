@@ -48,7 +48,7 @@ export interface CartesianRender {
      * its room with an ellipsis.
      */
     tick_labels?: 'auto' | 'every';
-    /** `auto` turns the ticks of a category axis only as far as each category needs to keep its whole label: 0, then -45, then -90. */
+    /** `auto` turns the ticks of a category axis only as far as each category needs to keep its whole label: 0, then -45, then -90; when none fits, the turn that labels more categories. */
     tick_angle?: 0 | -45 | -90 | 'auto';
   };
   y_axis?: { type?: 'value' | 'log'; label?: string };

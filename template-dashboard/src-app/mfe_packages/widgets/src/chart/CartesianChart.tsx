@@ -545,13 +545,16 @@ export function CartesianChart({
   const rows = rowsOf(data, axis);
   const secondary = data.series.some((_, index) => onSecondary(index));
   // `auto` turns the category ticks only as far as each band needs to hold its whole label: level, then 45°, then 90°.
+  // When no turn fits every band, 90° wins only where it labels more bands: 45° keeps the axis lower.
   const autoAngle = (): 0 | -45 | -90 => {
     if (axis !== 'category' || rows.length === 0 || width === 0) return 0;
     const plot = width - primaryWidth - (secondary ? secondaryWidth : 8);
     const longest = rows.reduce((max, row) => Math.max(max, tickText(row.x ?? null).length), 0);
     if (longest * TICK_CHAR_WIDTH + TICK_GAP.every <= plot / rows.length) return 0;
     const overhang = Math.max(0, Math.ceil(tickText(rows[0].x ?? null).length * TICK_CHAR_WIDTH * Math.SQRT1_2) - primaryWidth);
-    return TICK_TEXT_HEIGHT * Math.SQRT2 <= (plot - overhang) / rows.length ? -45 : -90;
+    const turned = (plot - overhang) / rows.length;
+    if (TICK_TEXT_HEIGHT * Math.SQRT2 <= turned) return -45;
+    return Math.ceil((TICK_TEXT_HEIGHT * rows.length) / plot) < Math.ceil((TICK_TEXT_HEIGHT * Math.SQRT2) / turned) ? -90 : -45;
   };
   const askedAngle = render.x_axis?.tick_angle ?? 0;
   // tick_angle turns the x ticks under the plot; a horizontal chart writes its categories level beside it.
